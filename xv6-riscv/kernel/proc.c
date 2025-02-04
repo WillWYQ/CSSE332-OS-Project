@@ -681,3 +681,11 @@ procdump(void)
     printf("\n");
   }
 }
+
+// added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
+uint64 spoon(void *arg)
+{
+  // Add your code here...
+  printf("In spoon system call with argument %p\n", arg);
+  return 0;
+}

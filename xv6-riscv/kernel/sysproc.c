@@ -89,3 +89,12 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
+uint64 sys_spoon(void)
+{
+  // obtain the argument from the stack, we need some special handling
+  uint64 addr;
+  argaddr(0, &addr);
+  return spoon((void*)addr);
+}
