@@ -703,7 +703,7 @@ uint64 thread_join(int *tid) {
     return -1;  
 }
 
-void thread_exit(int *tid) {
+uint64 thread_exit(int *tid) {
   // Add your code here...
     printf("thread_exit(%p) - Not implemented yet!\n", tid);
     return -1;
