@@ -688,5 +688,23 @@ spoon(void *arg)
 {
   // Add your code here...
   printf("In spoon system call with argument %p\n", arg);
-  return 0;
+  return -1;
+}
+
+uint64 thread_create(void *args, void (*start_routine)(void*), int *tid) {
+    // Add your code here...
+    printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
+    return -1;  
+}
+
+uint64 thread_join(int *tid) {
+  // Add your code here...
+    printf("thread_join(%p) - Not implemented yet!\n", tid);
+    return -1;  
+}
+
+void thread_exit(int *tid) {
+  // Add your code here...
+    printf("thread_exit(%p) - Not implemented yet!\n", tid);
+    return -1;
 }

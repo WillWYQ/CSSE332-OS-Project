@@ -91,10 +91,41 @@ sys_uptime(void)
 }
 
 // added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
-uint64 sys_spoon(void)
+uint64
+sys_spoon(void)
 {
   // obtain the argument from the stack, we need some special handling
   uint64 addr;
   argaddr(0, &addr);
   return spoon((void*)addr);
 }
+
+uint64
+sys_thread_create(void) {
+    uint64 args, start_func, tid;
+    argaddr(0, &args);
+    argaddr(1, &start_func);
+    argaddr(2, &tid);
+    
+    printf("sys_thread_create(%p, %p, %p) - Not implemented yet!\n", (void*)args, (void*)start_func, (void*)tid);
+    return thread_create((void*)args,(void*)start_func,(void*)tid);
+}
+
+uint64
+sys_thread_join(void) {
+    uint64 tid;
+    argaddr(0, &tid);
+
+    printf("sys_thread_join(%p) - Not implemented yet!\n", (void*)tid);
+    return thread_join((void*)tid);
+}
+
+uint64
+sys_thread_exit(void) {
+    uint64 tid;
+    argaddr(0, &tid);
+    
+    printf("sys_thread_exit(%p) - Not implemented yet!\n", (void*)tid);
+    return thread_exit((void*)tid);
+}
+

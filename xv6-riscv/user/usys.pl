@@ -39,3 +39,6 @@ entry("uptime");
 
 # added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
 entry("spoon");
+entry("thread_create");
+entry("thread_join");
+entry("thread_exit");

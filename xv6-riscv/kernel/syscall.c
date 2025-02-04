@@ -104,6 +104,9 @@ extern uint64 sys_close(void);
 
 // added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
 extern uint64 sys_spoon(void);
+extern uint64 sys_thread_create(void);
+extern uint64 sys_thread_join(void);
+extern uint64 sys_thread_exit(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -131,6 +134,9 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 // added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
 [SYS_spoon]   sys_spoon,
+[SYS_thread_create]  sys_thread_create,
+[SYS_thread_join]    sys_thread_join,
+[SYS_thread_exit]    sys_thread_exit,
 };
 
 void

@@ -23,3 +23,6 @@
 
 // added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
 #define SYS_spoon  22
+#define SYS_thread_create 23
+#define SYS_thread_join 24
+#define SYS_thread_exit 25
