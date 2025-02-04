@@ -107,7 +107,6 @@ sys_thread_create(void) {
     argaddr(1, &start_func);
     argaddr(2, &tid);
     
-    printf("sys_thread_create(%p, %p, %p) - Not implemented yet!\n", (void*)args, (void*)start_func, (void*)tid);
     return thread_create((void*)args,(void*)start_func,(void*)tid);
 }
 
@@ -115,8 +114,6 @@ uint64
 sys_thread_join(void) {
     uint64 tid;
     argaddr(0, &tid);
-
-    printf("sys_thread_join(%p) - Not implemented yet!\n", (void*)tid);
     return thread_join((void*)tid);
 }
 
@@ -125,7 +122,6 @@ sys_thread_exit(void) {
     uint64 tid;
     argaddr(0, &tid);
     
-    printf("sys_thread_exit(%p) - Not implemented yet!\n", (void*)tid);
     return thread_exit((void*)tid);
 }
 
