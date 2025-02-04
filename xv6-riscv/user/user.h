@@ -41,4 +41,4 @@ int memcmp(const void *, const void *, uint);
 void *memcpy(void *, const void *, uint);
 
 // added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
-int spoon(void*);
+uint64 spoon(void*);
