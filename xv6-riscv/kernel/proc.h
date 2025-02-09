@@ -109,6 +109,6 @@ struct proc {
   struct proc *parent_thread;  // Points to the parent thread
   struct proc *last_thread; // Linked list for last same level threads, point to it self if it is the head
   struct proc *next_thread; // Linked list for next same level threads, point to it self if it is the end
-  struct proc *child_thread; // Linked list for next child level threads, point to it self if it is the end
+  struct proc *child_thread; // Linked list for any child level threads
 
 };
