@@ -372,6 +372,8 @@ exit(int status)
 
   // Parent might be sleeping in wait().
   wakeup(p->parent);
+
+  // TODO: Modify exit() in kernel/proc.c to terminate all threads when the main process exits.
   
   acquire(&p->lock);
 
@@ -704,29 +706,53 @@ uint64 thread_join(int *tid) {
 }
 
 
+// TODO are we have thread id or just kill the current runing thread
 // implemented by Yueqiao Wang on Feb 9 
 uint64 thread_exit(int *tid) {
 
+
     struct proc *t = myproc();
+    struct proc *p = t->parent_thread;
+
 
     begin_op();
     iput(t->cwd);
     end_op();
     t->cwd = 0;
-    
-    acquire(&t->lock);
-    
-    // Mark thread as ZOMBIE
-    t->state = ZOMBIE;
-    
-    // Wake up parent thread if it's waiting
-    wakeup(t->parent_thread);
-    
-    release(&t->lock);
 
-    // Call scheduler to switch context
+    acquire(&p->lock);
+
+     if (t->next_thread == t && t->last_thread == t) { // only thread in list
+        p->child_thread = 0;
+    } else {
+        if (p->child_thread == t) // If exiting thread is the first in list
+            p->child_thread = t->next_thread;
+        
+        t->last_thread->next_thread = t->next_thread;
+        t->next_thread->last_thread = t->last_thread;
+    }
+
+    // TODO confirm do we need this
+    // Also, recursively kill all child threads
+    struct proc *child = t->child_thread;
+    while (child) {
+        acquire(&child->lock);
+        child->killed = 1;
+        if (child->state == SLEEPING)
+            child->state = RUNNABLE;
+        release(&child->lock);
+        child = child->next_thread;
+    }
+
+    release(&p->lock);
+
+    // Mark as ZOMBIE and schedule another process
+    acquire(&t->lock);
+    t->state = ZOMBIE;
+    wakeup(p);  // Wake up any thread waiting in thread_join()
+    release(&t->lock);
     sched();
-    
+
     panic("zombie thread exit");
 
     return -1;

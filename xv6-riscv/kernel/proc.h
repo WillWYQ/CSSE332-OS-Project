@@ -104,4 +104,11 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  int is_thread;  // New flag to distinguish threads from processes
+  struct proc *parent_thread;  // Points to the parent thread
+  struct proc *last_thread; // Linked list for last same level threads, point to it self if it is the head
+  struct proc *next_thread; // Linked list for next same level threads, point to it self if it is the end
+  struct proc *child_thread; // Linked list for next child level threads, point to it self if it is the end
+
 };
