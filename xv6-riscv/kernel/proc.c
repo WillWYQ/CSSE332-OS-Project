@@ -703,8 +703,31 @@ uint64 thread_join(int *tid) {
     return -1;  
 }
 
+
+// implemented by Yueqiao Wang on Feb 9 
 uint64 thread_exit(int *tid) {
-  // Add your code here...
-    printf("thread_exit(%p) - Not implemented yet!\n", tid);
+
+    struct proc *t = myproc();
+
+    begin_op();
+    iput(t->cwd);
+    end_op();
+    t->cwd = 0;
+    
+    acquire(&t->lock);
+    
+    // Mark thread as ZOMBIE
+    t->state = ZOMBIE;
+    
+    // Wake up parent thread if it's waiting
+    wakeup(t->parent_thread);
+    
+    release(&t->lock);
+
+    // Call scheduler to switch context
+    sched();
+    
+    panic("zombie thread exit");
+
     return -1;
 }
