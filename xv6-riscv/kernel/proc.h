@@ -105,10 +105,13 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
+  // TODO: do we want a counter to see if a proc has child thread or no?
+  // int num_threads; // Number of active child threads
+
   int is_thread;  // New flag to distinguish threads from processes
-  struct proc *parent_thread;  // Points to the parent thread
+  int tid; // Thread ID, 0 for main process, > 0 for child threads
+  struct proc *any_child; // to its first (should be) child, point to itself if no child
   struct proc *last_thread; // Linked list for last same level threads, point to it self if it is the head
   struct proc *next_thread; // Linked list for next same level threads, point to it self if it is the end
-  struct proc *child_thread; // Linked list for any child level threads
 
 };
