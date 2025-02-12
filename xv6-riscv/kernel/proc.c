@@ -52,9 +52,9 @@ procinit(void)
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
-      initlock(&p->lock, "proc");
-      p->state = UNUSED;
-      p->kstack = KSTACK((int) (p - proc));
+    initlock(&p->lock, "proc");
+    p->state = UNUSED;
+    p->kstack = KSTACK((int) (p - proc));
   }
 }
 
@@ -121,7 +121,7 @@ allocproc(void)
   }
   return 0;
 
-found:
+  found:
   p->pid = allocpid();
   p->state = USED;
 
@@ -188,21 +188,21 @@ proc_pagetable(struct proc *p)
   // only the supervisor uses it, on the way
   // to/from user space, so not PTE_U.
   if(mappages(pagetable, TRAMPOLINE, PGSIZE,
-              (uint64)trampoline, PTE_R | PTE_X) < 0){
+    (uint64)trampoline, PTE_R | PTE_X) < 0){
     uvmfree(pagetable, 0);
-    return 0;
-  }
+  return 0;
+}
 
   // map the trapframe page just below the trampoline page, for
   // trampoline.S.
-  if(mappages(pagetable, TRAPFRAME, PGSIZE,
-              (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
-    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
-    uvmfree(pagetable, 0);
-    return 0;
-  }
+if(mappages(pagetable, TRAPFRAME, PGSIZE,
+  (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+  uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+uvmfree(pagetable, 0);
+return 0;
+}
 
-  return pagetable;
+return pagetable;
 }
 
 // Free a process's page table, and free the
@@ -306,113 +306,113 @@ fork(void)
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
-  np->cwd = idup(p->cwd);
+    np->cwd = idup(p->cwd);
 
-  safestrcpy(np->name, p->name, sizeof(p->name));
+    safestrcpy(np->name, p->name, sizeof(p->name));
 
-  pid = np->pid;
+    pid = np->pid;
 
-  release(&np->lock);
+    release(&np->lock);
 
-  acquire(&wait_lock);
-  np->parent = p;
-  release(&wait_lock);
+    acquire(&wait_lock);
+    np->parent = p;
+    release(&wait_lock);
 
-  acquire(&np->lock);
-  np->state = RUNNABLE;
-  release(&np->lock);
+    acquire(&np->lock);
+    np->state = RUNNABLE;
+    release(&np->lock);
 
-  return pid;
-}
+    return pid;
+  }
 
 // Pass p's abandoned children to init.
 // Caller must hold wait_lock.
-void
-reparent(struct proc *p)
-{
-  struct proc *pp;
+  void
+  reparent(struct proc *p)
+  {
+    struct proc *pp;
 
-  for(pp = proc; pp < &proc[NPROC]; pp++){
-    if(pp->parent == p){
-      pp->parent = initproc;
-      wakeup(initproc);
+    for(pp = proc; pp < &proc[NPROC]; pp++){
+      if(pp->parent == p){
+        pp->parent = initproc;
+        wakeup(initproc);
+      }
     }
   }
-}
 
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait().
-void
-exit(int status)
-{
-  struct proc *p = myproc();
+  void
+  exit(int status)
+  {
+    struct proc *p = myproc();
 
-  if(p == initproc)
-    panic("init exiting");
+    if(p == initproc)
+      panic("init exiting");
 
   // Close all open files.
-  for(int fd = 0; fd < NOFILE; fd++){
-    if(p->ofile[fd]){
-      struct file *f = p->ofile[fd];
-      fileclose(f);
-      p->ofile[fd] = 0;
+    for(int fd = 0; fd < NOFILE; fd++){
+      if(p->ofile[fd]){
+        struct file *f = p->ofile[fd];
+        fileclose(f);
+        p->ofile[fd] = 0;
+      }
     }
-  }
 
-  begin_op();
-  iput(p->cwd);
-  end_op();
-  p->cwd = 0;
+    begin_op();
+    iput(p->cwd);
+    end_op();
+    p->cwd = 0;
 
-  acquire(&wait_lock);
+    acquire(&wait_lock);
 
   // Give any children to init.
-  reparent(p);
+    reparent(p);
 
   // Parent might be sleeping in wait().
-  wakeup(p->parent);
+    wakeup(p->parent);
 
   // TODO: Modify exit() in kernel/proc.c to terminate all threads when the main process exits.
-  
-  acquire(&p->lock);
 
-  p->xstate = status;
-  p->state = ZOMBIE;
+    acquire(&p->lock);
 
-  release(&wait_lock);
+    p->xstate = status;
+    p->state = ZOMBIE;
+
+    release(&wait_lock);
 
   // Jump into the scheduler, never to return.
-  sched();
-  panic("zombie exit");
-}
+    sched();
+    panic("zombie exit");
+  }
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
-int
-wait(uint64 addr)
-{
-  struct proc *pp;
-  int havekids, pid;
-  struct proc *p = myproc();
+  int
+  wait(uint64 addr)
+  {
+    struct proc *pp;
+    int havekids, pid;
+    struct proc *p = myproc();
 
-  acquire(&wait_lock);
+    acquire(&wait_lock);
 
-  for(;;){
+    for(;;){
     // Scan through table looking for exited children.
-    havekids = 0;
-    for(pp = proc; pp < &proc[NPROC]; pp++){
-      if(pp->parent == p){
+      havekids = 0;
+      for(pp = proc; pp < &proc[NPROC]; pp++){
+        if(pp->parent == p){
         // make sure the child isn't still in exit() or swtch().
-        acquire(&pp->lock);
+          acquire(&pp->lock);
 
-        havekids = 1;
-        if(pp->state == ZOMBIE){
+          havekids = 1;
+          if(pp->state == ZOMBIE){
           // Found one.
-          pid = pp->pid;
-          if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
-                                  sizeof(pp->xstate)) < 0) {
-            release(&pp->lock);
+            pid = pp->pid;
+            if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
+              sizeof(pp->xstate)) < 0) {
+              release(&pp->lock);
             release(&wait_lock);
             return -1;
           }
@@ -661,12 +661,12 @@ void
 procdump(void)
 {
   static char *states[] = {
-  [UNUSED]    "unused",
-  [USED]      "used",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
+    [UNUSED]    "unused",
+    [USED]      "used",
+    [SLEEPING]  "sleep ",
+    [RUNNABLE]  "runble",
+    [RUNNING]   "run   ",
+    [ZOMBIE]    "zombie"
   };
   struct proc *p;
   char *state;
@@ -695,50 +695,96 @@ spoon(void *arg)
 
 uint64 thread_create(void *args, void (*start_routine)(void*), int *tid) {
     // Add your code here...
-    printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
-    return -1;  
+  printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
+  return -1;  
 }
 
-uint64 thread_join(int *tid) {
-  // Add your code here...
-    printf("thread_join(%p) - Not implemented yet!\n", tid);
-    return -1;  
+uint64 thread_join(int *tid) { // if tid is null, wait for any one, if it is not, wait for that one
+
+  struct proc *p = myproc(); // Get the calling process
+  struct proc *t;
+
+  acquire(&p->lock);
+
+  if (!t) {
+    // No child threads found
+    release(&p->lock);
+    return -1;
+  }
+  do {
+    acquire(&t->lock);
+
+    if (tid && t->tid != *tid) {
+      // If tid is provided, we are looking for a specific thread and this isn't it, continue
+      release(&t->lock);
+      t = t->next_thread;
+      continue;
+    }
+
+    if (t->state == ZOMBIE) {
+
+      // Remove the thread from the linked list
+      if (t->last_thread != t) {
+        t->last_thread->next_thread = t->next_thread;
+        t->next_thread->last_thread = t->last_thread;
+      } else {
+        // Last remaining thread
+        p->any_child = 0;
+      }
+
+      release(&t->lock);
+      release(&p->lock);
+      freeproc(t);
+
+      return 0;
+    }
+
+    release(&t->lock);
+    t = t->next_thread;
+    
+  } while (t != p->any_child); 
+  
+
+  // If no zombie threads found, sleep and wait
+  sleep(p, &p->lock);
+  printf("thread_join(%p) - Not implemented yet!\n", tid);
+  return -1;  
 }
 
 
 // TODO are we have thread id or just kill the current runing thread
 // implemented by Yueqiao Wang on Feb 9 
 uint64 thread_exit(int *tid) {
-    struct proc *t = myproc();
+  struct proc *t = myproc();
 
-    if (!t->is_thread)
-    {
-      panic("this is not a thread");
-    }
-    struct proc *p = t->parent;
+  if (!t->is_thread)
+  {
+    panic("this is not a thread");
+  }
+  struct proc *p = t->parent;
 
-    begin_op();
-    iput(t->cwd);
-    end_op();
-    t->cwd = 0;
+  begin_op();
+  iput(t->cwd);
+  end_op();
+  t->cwd = 0;
 
-    acquire(&p->lock);
+  acquire(&p->lock);
 
     // Handle thread list updates
-    if (t->last_thread != t) {
-        t->last_thread->next_thread = t->next_thread;
-        t->next_thread->last_thread = t->last_thread;
-    } else {
+  if (t->last_thread != t) {
+    t->last_thread->next_thread = t->next_thread;
+    t->next_thread->last_thread = t->last_thread;
+  } else {
         // If this is the only thread, update parent process accordingly
-        if (p->any_child == t) {
-            p->any_child = (t->next_thread != t) ? t->next_thread : 0;
-        }
+    if (p->any_child == t) {
+      p->any_child = (t->next_thread != t) ? t->next_thread : 0;
     }
+  }
 
-    release(&p->lock);
+  release(&p->lock);
 
-    acquire(&t->lock);
-    t->state = ZOMBIE;
+  acquire(&t->lock);
+  t->state = ZOMBIE;
     wakeup(p);  // Wake up any thread waiting in thread_join()
     release(&t->lock);
     sched();
@@ -746,4 +792,4 @@ uint64 thread_exit(int *tid) {
     panic("zombie thread exit");
 
     return -1;
-}
+  }
