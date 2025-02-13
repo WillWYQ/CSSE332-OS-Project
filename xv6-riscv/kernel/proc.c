@@ -694,13 +694,13 @@ spoon(void *arg)
 }
 
 
-void *thread_fn(void* args, void (*start_routine)(void*), int *tid){
-  start_routine(void* args);
-  thread_exit(tid);
-}
+// void *thread_fn(void* args, void (*start_routine)(void*), int *tid){
+//   start_routine(args);
+//   thread_exit(tid);
+// }
 
 
-uint64 thread_create(void *args, void (*start_routine)(void*), int *tid) {
+uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * stack_pointer) {
   
   //want for tid to be unique
   
@@ -725,18 +725,18 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid) {
     return -1;
   }
   tp->sz = p->sz;
-  proc_mapstacks(tp->pagetable);//add its own stack
-
+  // proc_mapstacks(tp->pagetable);//add its own stack
 
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);
     
     //my code begins here
-    tp ->trapframe->pc = thread_fn;//this sends it to thread function
+    tp ->trapframe->pc = start_routine;//this sends it to thread function
+    tp ->trapframe->pc = stack_pointer;
     //setup args
-    tp->trapframe->a0 = args;
-    tp->trapframe->a1 = startroutine;
-    tp->trapframe->a2 = tid;
+    // tp->trapframe->a0 = args;
+    // tp->trapframe->a1 = startroutine;
+    // tp->trapframe->a2 = tid;
 
     tp->cwd = idup(p->cwd);
 
