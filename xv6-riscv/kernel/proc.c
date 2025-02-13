@@ -693,6 +693,13 @@ spoon(void *arg)
   return -1;
 }
 
+
+void *thread_fn(void* args, void (*start_routine)(void*), int *tid){
+  start_routine(void* args);
+  thread_exit(tid);
+}
+
+
 uint64 thread_create(void *args, void (*start_routine)(void*), int *tid) {
   
   //want for tid to be unique
@@ -712,18 +719,25 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid) {
   }
 
   // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+  if(uvmcopy(p->pagetable, tp->pagetable, p->sz) < 0){
     freeproc(tp);
     release(&tp->lock);
     return -1;
   }
   tp->sz = p->sz;
+  proc_mapstacks(tp->pagetable);//add its own stack
+
 
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);
     
     //my code begins here
-    tp ->trapframe-> pc = start_routine;
+    tp ->trapframe->pc = thread_fn;//this sends it to thread function
+    //setup args
+    tp->trapframe->a0 = args;
+    tp->trapframe->a1 = startroutine;
+    tp->trapframe->a2 = tid;
+
     tp->cwd = idup(p->cwd);
 
     safestrcpy(tp->name, p->name, sizeof(p->name));
