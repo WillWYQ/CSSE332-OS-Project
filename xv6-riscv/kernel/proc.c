@@ -697,6 +697,7 @@ spoon(void *arg)
 // void *thread_fn(void* args, void (*start_routine)(void*), int *tid){
 //   start_routine(args);
 //   thread_exit(tid);
+//   return 0;//doesn't matter bc thread_exit theoretically kills this process
 // }
 
 
@@ -725,9 +726,11 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
   *(tp->trapframe) = *(p->trapframe);
 
   // Cause fork to return 0 in the child.
-  tp->trapframe->epc = (uint64) start_routine;
+  tp->trapframe->epc = (uint64) start_routine;//thread_fn;
   tp->trapframe->sp = (uint64) stack_pointer;
   tp->trapframe->a0 = (uint64) args;//if the code I enter into isn't expecting a return value it won't use this as a return value it will use it as the normal arg register
+  // tp->trapframe->a1 = (uint64) start_routine;
+  // tp->trapframe->a2 = (uint64) tid;
 
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)

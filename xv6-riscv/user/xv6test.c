@@ -21,7 +21,7 @@ void test_thread_create_fn2(void * args){
 void test_thread_create_fn3(void * args){
   int tid = *(int *) args;
   while(1)
-  printf("This is thread %d running test_thread_create_fn3 at %p\n", tid, test_thread_create_fn3);
+    printf("This is thread %d running test_thread_create_fn3 at %p\n", tid, test_thread_create_fn3);
   return;
 }
 
@@ -40,6 +40,7 @@ void test_thread_with_args_m2(void){
   //TODO: talk with team about how the final tid arg works
   //TODO: add join lower in this
   printf("===============Threads With Args==============\n");
+  // int* threads[NUM_THREADS];
   int tids[NUM_THREADS];
   void * stacks[NUM_THREADS];
   for(int i = 0; i < NUM_THREADS; i++){
@@ -60,9 +61,9 @@ void test_spoon_m1(void){
 
 int main(int argc, char *argv[]) {
   //TODO: Write code to select what tests to run
-  // test_thread_start_at_pc_m2();
+  test_thread_start_at_pc_m2();
 
-  test_thread_with_args_m2();
+  // test_thread_with_args_m2();
 
   // test_spoon_m1();
 
