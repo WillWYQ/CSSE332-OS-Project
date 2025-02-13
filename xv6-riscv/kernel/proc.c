@@ -322,7 +322,7 @@ fork(void)
     np->state = RUNNABLE;
     release(&np->lock);
 
-    return pid;
+    return pid;//this is the return for the current proc
 }
 
 // Pass p's abandoned children to init.
@@ -703,9 +703,55 @@ spoon(void *arg)
 uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * stack_pointer) {
   
   //want for tid to be unique
-  
+  int i, pid;
+  //thread_process
+  struct proc *tp;
+  struct proc *p = myproc();
 
+  // Allocate process.
+  if((tp = allocproc()) == 0){
+    return -1;
+  }
 
+  // Copy user memory from parent to child.
+  if(uvmcopy(p->pagetable, tp->pagetable, p->sz) < 0){
+    freeproc(tp);
+    release(&tp->lock);
+    return -1;
+  }
+  tp->sz = p->sz;
+
+  // copy saved user registers.
+  *(tp->trapframe) = *(p->trapframe);
+
+  // Cause fork to return 0 in the child.
+  tp->trapframe->epc = (uint64) start_routine;
+  tp->trapframe->sp = (uint64) stack_pointer;
+  tp->trapframe->a0 = (uint64) args;//if the code I enter into isn't expecting a return value it won't use this as a return value it will use it as the normal arg register
+
+  // increment reference counts on open file descriptors.
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      tp->ofile[i] = filedup(p->ofile[i]);
+  tp->cwd = idup(p->cwd);
+
+  safestrcpy(tp->name, p->name, sizeof(p->name));
+
+    pid = tp->pid;
+
+    release(&tp->lock);
+
+    acquire(&wait_lock);
+    tp->parent = p;
+    release(&wait_lock);
+
+    acquire(&tp->lock);
+    tp->state = RUNNABLE;
+    release(&tp->lock);//once tp releases its lock as runnable it is free to runs
+
+    return pid;
+
+/*
   // Add your code here...
   // int i;
 
@@ -725,14 +771,14 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
     return -1;
   }
   tp->sz = p->sz;
-  // proc_mapstacks(tp->pagetable);//add its own stack
+  
 
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);
     
     //my code begins here
     tp ->trapframe->epc = (uint64) start_routine;//this sends it to thread function
-    tp ->trapframe->sp = (uint64) stack_pointer;
+    // tp ->trapframe->sp = (uint64) stack_pointer;
     //setup args
     // tp->trapframe->a0 = args;
     // tp->trapframe->a1 = startroutine;
@@ -755,7 +801,7 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
     
    
     return *tid;
-  
+  */
   
     printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
   return -1;    
