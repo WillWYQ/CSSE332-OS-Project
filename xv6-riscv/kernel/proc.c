@@ -306,9 +306,9 @@ fork(void)
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
-    np->cwd = idup(p->cwd);
+  np->cwd = idup(p->cwd);
 
-    safestrcpy(np->name, p->name, sizeof(p->name));
+  safestrcpy(np->name, p->name, sizeof(p->name));
 
     pid = np->pid;
 
@@ -323,7 +323,7 @@ fork(void)
     release(&np->lock);
 
     return pid;
-  }
+}
 
 // Pass p's abandoned children to init.
 // Caller must hold wait_lock.
@@ -707,7 +707,7 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
 
 
   // Add your code here...
-  int i;
+  // int i;
 
   //tp->thread_process
   struct proc *tp;
@@ -731,8 +731,8 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
   *(tp->trapframe) = *(p->trapframe);
     
     //my code begins here
-    tp ->trapframe->pc = start_routine;//this sends it to thread function
-    tp ->trapframe->pc = stack_pointer;
+    tp ->trapframe->epc = (uint64) start_routine;//this sends it to thread function
+    tp ->trapframe->sp = (uint64) stack_pointer;
     //setup args
     // tp->trapframe->a0 = args;
     // tp->trapframe->a1 = startroutine;
@@ -754,7 +754,7 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
 
     
    
-    return tid;
+    return *tid;
   
   
     printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
@@ -764,7 +764,7 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
 uint64 thread_join(int *tid) { // if tid is null, wait for any one, if it is not, wait for that one
 
   struct proc *p = myproc(); // Get the calling process
-  struct proc *t;
+  struct proc *t = p->any_child;
 
   acquire(&p->lock);
 
