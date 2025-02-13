@@ -694,9 +694,57 @@ spoon(void *arg)
 }
 
 uint64 thread_create(void *args, void (*start_routine)(void*), int *tid) {
-    // Add your code here...
-  printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
-  return -1;  
+  
+  //want for tid to be unique
+  
+
+
+  // Add your code here...
+  int i;
+
+  //tp->thread_process
+  struct proc *tp;
+  struct proc *p = myproc();
+
+  // Allocate process.
+  if((tp = allocproc()) == 0){
+    return -1;
+  }
+
+  // Copy user memory from parent to child.
+  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+    freeproc(tp);
+    release(&tp->lock);
+    return -1;
+  }
+  tp->sz = p->sz;
+
+  // copy saved user registers.
+  *(tp->trapframe) = *(p->trapframe);
+    
+    //my code begins here
+    tp ->trapframe-> pc = start_routine;
+    tp->cwd = idup(p->cwd);
+
+    safestrcpy(tp->name, p->name, sizeof(p->name));
+
+    release(&tp->lock);
+
+    acquire(&wait_lock);
+    tp->parent = p;
+    release(&wait_lock);
+
+    acquire(&tp->lock);
+    tp->state = RUNNABLE;
+    release(&tp->lock);
+
+    
+   
+    return tid;
+  
+  
+    printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
+  return -1;    
 }
 
 uint64 thread_join(int *tid) { // if tid is null, wait for any one, if it is not, wait for that one
