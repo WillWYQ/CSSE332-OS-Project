@@ -303,134 +303,135 @@ fork(void)
   np->trapframe->a0 = 0;
 
   // increment reference counts on open file descriptors.
-  for(i = 0; i < NOFILE; i++)
+  for(i = 0; i < NOFILE; i++){
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
-    np->cwd = idup(p->cwd);
-
-    safestrcpy(np->name, p->name, sizeof(p->name));
-
-    pid = np->pid;
-
-    release(&np->lock);
-
-    acquire(&wait_lock);
-    np->parent = p;
-    release(&wait_lock);
-
-    acquire(&np->lock);
-    np->state = RUNNABLE;
-    release(&np->lock);
-
-    return pid;//this is the return for the current proc
   }
+  np->cwd = idup(p->cwd);
+
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+  pid = np->pid;
+
+  release(&np->lock);
+
+  acquire(&wait_lock);
+  np->parent = p;
+  release(&wait_lock);
+
+  acquire(&np->lock);
+  np->state = RUNNABLE;
+  release(&np->lock);
+
+  return pid;//this is the return for the current proc
+}
 
 // Pass p's abandoned children to init.
 // Caller must hold wait_lock.
-  void
-  reparent(struct proc *p)
-  {
-    struct proc *pp;
+void
+reparent(struct proc *p)
+{
+  struct proc *pp;
 
-    for(pp = proc; pp < &proc[NPROC]; pp++){
-      if(pp->parent == p){
-        pp->parent = initproc;
-        wakeup(initproc);
-      }
+  for(pp = proc; pp < &proc[NPROC]; pp++){
+    if(pp->parent == p){
+      pp->parent = initproc;
+      wakeup(initproc);
     }
   }
+}
 
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait().
-  void
-  exit(int status)
-  {
-    struct proc *p = myproc();
+void
+exit(int status)
+{
+  struct proc *p = myproc();
 
-    if(p == initproc)
-      panic("init exiting");
+  if(p == initproc)
+    panic("init exiting");
 
   // Close all open files.
-    for(int fd = 0; fd < NOFILE; fd++){
-      if(p->ofile[fd]){
-        struct file *f = p->ofile[fd];
-        fileclose(f);
-        p->ofile[fd] = 0;
-      }
+  for(int fd = 0; fd < NOFILE; fd++){
+    if(p->ofile[fd]){
+      struct file *f = p->ofile[fd];
+      fileclose(f);
+      p->ofile[fd] = 0;
     }
+  }
 
-    begin_op();
-    iput(p->cwd);
-    end_op();
-    p->cwd = 0;
+  begin_op();
+  iput(p->cwd);
+  end_op();
+  p->cwd = 0;
 
-    acquire(&wait_lock);
+  acquire(&wait_lock);
 
   // Give any children to init.
-    reparent(p);
+  reparent(p);
 
   // Parent might be sleeping in wait().
-    wakeup(p->parent);
+  wakeup(p->parent);
 
   // TODO: Modify exit() in kernel/proc.c to terminate all threads when the main process exits.
 
-    acquire(&p->lock);
+  acquire(&p->lock);
 
-    p->xstate = status;
-    p->state = ZOMBIE;
+  p->xstate = status;
+  p->state = ZOMBIE;
 
-    release(&wait_lock);
+  release(&wait_lock);
 
   // Jump into the scheduler, never to return.
-    sched();
-    panic("zombie exit");
-  }
+  sched();
+  panic("zombie exit");
+}
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
-  int
-  wait(uint64 addr)
-  {
-    struct proc *pp;
-    int havekids, pid;
-    struct proc *p = myproc();
+int
+wait(uint64 addr)
+{
+  struct proc *pp;
+  int havekids, pid;
+  struct proc *p = myproc();
 
-    acquire(&wait_lock);
+  acquire(&wait_lock);
 
-    for(;;){
+  for(;;){
     // Scan through table looking for exited children.
-      havekids = 0;
-      for(pp = proc; pp < &proc[NPROC]; pp++){
-        if(pp->parent == p){
+    havekids = 0;
+    for(pp = proc; pp < &proc[NPROC]; pp++){
+      if(pp->parent == p){
         // make sure the child isn't still in exit() or swtch().
-          acquire(&pp->lock);
+        acquire(&pp->lock);
 
-          havekids = 1;
-          if(pp->state == ZOMBIE){
+        havekids = 1;
+        if(pp->state == ZOMBIE){
           // Found one.
-            pid = pp->pid;
-            if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
-              sizeof(pp->xstate)) < 0) {
-              release(&pp->lock);
-            release(&wait_lock);
-            return -1;
-          }
-          freeproc(pp);
-          release(&pp->lock);
+          pid = pp->pid;
+          if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
+            sizeof(pp->xstate)) < 0) {
+            release(&pp->lock);
           release(&wait_lock);
-          return pid;
+          return -1;
         }
+        freeproc(pp);
         release(&pp->lock);
+        release(&wait_lock);
+        return pid;
       }
+      release(&pp->lock);
     }
+  }
 
     // No point waiting if we don't have any children.
-    if(!havekids || killed(p)){
-      release(&wait_lock);
-      return -1;
-    }
-    
+  if(!havekids || killed(p)){
+    release(&wait_lock);
+    return -1;
+  }
+
     // Wait for a child to exit.
     sleep(p, &wait_lock);  //DOC: wait-sleep
   }
@@ -704,7 +705,7 @@ spoon(void *arg)
 uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * stack_pointer) {
 
   //want for tid to be unique
-  int i, pid;
+  int i, tpid;
   //thread_process
   struct proc *tp;
   struct proc *p = myproc();
@@ -713,6 +714,8 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
   if((tp = allocproc()) == 0){
     return -1;
   }
+
+  // acquire(&tp->lock); done in allocproc
 
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, tp->pagetable, p->sz) < 0){
@@ -733,83 +736,48 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
   // tp->trapframe->a2 = (uint64) tid;
 
   // increment reference counts on open file descriptors.
-  for(i = 0; i < NOFILE; i++)
+  for(i = 0; i < NOFILE; i++){
     if(p->ofile[i])
       tp->ofile[i] = filedup(p->ofile[i]);
-    tp->cwd = idup(p->cwd);
-
-    safestrcpy(tp->name, p->name, sizeof(p->name));
-
-    pid = tp->pid;
-
-    release(&tp->lock);
-
-    acquire(&wait_lock);
-    tp->parent = p;
-    release(&wait_lock);
-
-    acquire(&tp->lock);
-    tp->state = RUNNABLE;
-    release(&tp->lock);//once tp releases its lock as runnable it is free to runs
-
-    return pid;
-
-/*
-  // Add your code here...
-  // int i;
-
-  //tp->thread_process
-  struct proc *tp;
-  struct proc *p = myproc();
-
-  // Allocate process.
-  if((tp = allocproc()) == 0){
-    return -1;
   }
+  tp->cwd = idup(p->cwd);
 
-  // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, tp->pagetable, p->sz) < 0){
-    freeproc(tp);
-    release(&tp->lock);
-    return -1;
+  safestrcpy(tp->name, p->name, sizeof(p->name));
+
+  tpid = tp->pid;
+
+  tp->parent = p;
+  tp->is_thread = 1;
+
+
+  // Update parent's thread list.
+  acquire(&p->lock);
+  if(p->any_child == 0){
+    // No child exists yet.
+    p->any_child = tp;
+    tp->next_thread = tp; // Circular list: next points to self.
+    tp->last_thread = tp; // Circular list: last points to self.
+  } else {
+    // Parent already has at least one child.
+    // p->any_child points to the first child.
+    struct proc *first = p->any_child;
+    struct proc *last = first->last_thread; // Last child in the circular list.
+    // Insert the new thread at the tail.
+    tp->last_thread = last;
+    tp->next_thread = first;
+    last->next_thread = tp;
+    first->last_thread = tp;
   }
-  tp->sz = p->sz;
+  release(&p->lock);
+
+  tp->state = RUNNABLE;
   
+  release(&tp->lock);//once tp releases its lock as runnable it is free to runs
 
-  // copy saved user registers.
-  *(tp->trapframe) = *(p->trapframe);
-    
-    //my code begins here
-    tp ->trapframe->epc = (uint64) start_routine;//this sends it to thread function
-    // tp ->trapframe->sp = (uint64) stack_pointer;
-    //setup args
-    // tp->trapframe->a0 = args;
-    // tp->trapframe->a1 = startroutine;
-    // tp->trapframe->a2 = tid;
-
-    tp->cwd = idup(p->cwd);
-
-    safestrcpy(tp->name, p->name, sizeof(p->name));
-
-    release(&tp->lock);
-
-    acquire(&wait_lock);
-    tp->parent = p;
-    release(&wait_lock);
-
-    acquire(&tp->lock);
-    tp->state = RUNNABLE;
-    release(&tp->lock);
-
-    
-   
-    return *tid;
-        printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
-  return -1;    
-  */
-
+  return tpid;
 
 }
+
 
 uint64 thread_join(int *tid) { // if tid is null, wait for any one, if it is not, wait for that one
 
