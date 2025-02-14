@@ -306,9 +306,9 @@ fork(void)
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
-  np->cwd = idup(p->cwd);
+    np->cwd = idup(p->cwd);
 
-  safestrcpy(np->name, p->name, sizeof(p->name));
+    safestrcpy(np->name, p->name, sizeof(p->name));
 
     pid = np->pid;
 
@@ -323,7 +323,7 @@ fork(void)
     release(&np->lock);
 
     return pid;//this is the return for the current proc
-}
+  }
 
 // Pass p's abandoned children to init.
 // Caller must hold wait_lock.
@@ -702,7 +702,7 @@ spoon(void *arg)
 
 
 uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * stack_pointer) {
-  
+
   //want for tid to be unique
   int i, pid;
   //thread_process
@@ -736,9 +736,9 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
       tp->ofile[i] = filedup(p->ofile[i]);
-  tp->cwd = idup(p->cwd);
+    tp->cwd = idup(p->cwd);
 
-  safestrcpy(tp->name, p->name, sizeof(p->name));
+    safestrcpy(tp->name, p->name, sizeof(p->name));
 
     pid = tp->pid;
 
@@ -804,10 +804,11 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
     
    
     return *tid;
-  */
-  
-    printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
+        printf("thread_create(%p, %p, %p) - Not implemented yet!\n", args, start_routine, tid);
   return -1;    
+  */
+
+
 }
 
 uint64 thread_join(int *tid) { // if tid is null, wait for any one, if it is not, wait for that one
