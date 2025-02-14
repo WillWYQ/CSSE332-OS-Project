@@ -867,7 +867,11 @@ uint64 thread_exit(int *tid) {
 
   t->state = ZOMBIE;
   wakeup(p);  // Wake up any thread waiting in thread_join()
+
+  // Release both locks
+  release(&p->lock);
   release(&t->lock);
+  
   sched();
   panic("zombie thread exit");
   return -1;
