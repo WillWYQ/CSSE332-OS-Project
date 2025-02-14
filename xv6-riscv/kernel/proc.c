@@ -752,6 +752,7 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
 
   // Update parent's thread list.
   acquire(&p->lock);
+
   if(p->any_child == 0){
     // No child exists yet.
     p->any_child = tp;
@@ -841,6 +842,9 @@ uint64 thread_exit(int *tid) {
   {
     panic("this is not a thread");
   }
+
+  acquire(&t->lock);
+
   struct proc *p = t->parent;
 
   begin_op();
@@ -861,15 +865,10 @@ uint64 thread_exit(int *tid) {
     }
   }
 
-  release(&p->lock);
-
-  acquire(&t->lock);
   t->state = ZOMBIE;
-    wakeup(p);  // Wake up any thread waiting in thread_join()
-    release(&t->lock);
-    sched();
-
-    panic("zombie thread exit");
-
-    return -1;
-  }
+  wakeup(p);  // Wake up any thread waiting in thread_join()
+  release(&t->lock);
+  sched();
+  panic("zombie thread exit");
+  return -1;
+}
