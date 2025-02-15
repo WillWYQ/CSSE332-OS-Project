@@ -1,15 +1,16 @@
+// xv6test.c
 #include "kernel/types.h"
 #include "kernel/stat.h"
 #include "user/user.h"
 #include "kernel/riscv.h"
 
 #define NUM_THREADS 3
-#define LOOP_COUNT 100
+#define LOOP_COUNT 5
 
 // Test thread functions with no arguments.
 void test_thread_fn1(void *args) {
   for (int i = 0; i < LOOP_COUNT; i++) {
-    printf("fn1: iteration %d\n" , i);
+    printf("fn1 (NO-A: iteration %d\n" , i);
   }
   thread_exit(0);
 }
@@ -17,7 +18,7 @@ void test_thread_fn1(void *args) {
 // Test thread functions with no arguments.
 void test_thread_fn2(void *args) {
   for (int i = 0; i < LOOP_COUNT; i++) {
-    printf( "fn2: iteration %d\n" , i);
+    printf( "fn2 (NO-A: iteration %d\n" , i);
   }
   thread_exit(0);
 }
@@ -26,7 +27,7 @@ void test_thread_fn2(void *args) {
 void test_thread_fn3(void *args) {
   int tid = *(int *)args;
   for (int i = 0; i < LOOP_COUNT; i++) {
-    printf( "fn3 (tid %d): iteration %d\n" , tid, i);
+    printf( "fn3 (tid %d) (A: iteration %d\n" , tid, i);
   }
   thread_exit(0);
 }

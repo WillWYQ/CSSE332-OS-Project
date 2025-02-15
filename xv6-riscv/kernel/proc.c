@@ -843,8 +843,6 @@ uint64 thread_exit(int *tid) {
     panic("this is not a thread");
   }
 
-  acquire(&t->lock);
-
   struct proc *p = t->parent;
 
   begin_op();
@@ -853,7 +851,7 @@ uint64 thread_exit(int *tid) {
   t->cwd = 0;
 
   acquire(&p->lock);
-
+  acquire(&t->lock);
     // Handle thread list updates
   if (t->last_thread != t) {
     t->last_thread->next_thread = t->next_thread;
@@ -864,15 +862,15 @@ uint64 thread_exit(int *tid) {
       p->any_child = (t->next_thread != t) ? t->next_thread : 0;
     }
   }
+  wakeup(p);  // Wake up any thread waiting in thread_join()
+  release(&p->lock);
 
   t->state = ZOMBIE;
-  wakeup(p);  // Wake up any thread waiting in thread_join()
 
-  // Release both locks
-  release(&p->lock);
   release(&t->lock);
   
   sched();
+
   panic("zombie thread exit");
   return -1;
 }
