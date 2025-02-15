@@ -746,13 +746,15 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
 
   tpid = tp->pid;
 
+  // TODO: make sure the parent is the real main thread, not the one who created it
   tp->parent = p;
-  tp->is_thread = 1;
 
+
+
+  tp->is_thread = 1;
 
   // Update parent's thread list.
   acquire(&p->lock);
-
   if(p->any_child == 0){
     // No child exists yet.
     p->any_child = tp;
@@ -849,25 +851,30 @@ uint64 thread_exit(int *tid) {
   iput(t->cwd);
   end_op();
   t->cwd = 0;
-
-  acquire(&p->lock);
+  
   acquire(&t->lock);
+  acquire(&wait_lock);
+  
     // Handle thread list updates
   if (t->last_thread != t) {
     t->last_thread->next_thread = t->next_thread;
     t->next_thread->last_thread = t->last_thread;
   } else {
         // If this is the only thread, update parent process accordingly
+    acquire(&p->lock);
     if (p->any_child == t) {
       p->any_child = (t->next_thread != t) ? t->next_thread : 0;
     }
+    release(&p->lock);
   }
-  wakeup(p);  // Wake up any thread waiting in thread_join()
-  release(&p->lock);
 
+  wakeup(p);  // Wake up any thread waiting in thread_join()
+
+
+  t->xstate = t->state;
   t->state = ZOMBIE;
 
-  release(&t->lock);
+  release(&wait_lock);
   
   sched();
 

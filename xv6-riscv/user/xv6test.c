@@ -76,6 +76,7 @@ void test_spoon(void){
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     test_threads_no_args();
+    sleep(30);
     test_threads_with_args();
   } else {
     if (strcmp(argv[1], "noargs") == 0) {
