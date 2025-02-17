@@ -41,7 +41,7 @@ void test_threads_with_args(void){
   for(int i = 0; i < NUM_THREADS; i++){
     tids[i] = i;
     stacks[i] = malloc(PGSIZE);
-    int tid = thread_create(&tids[i], test_thread_fn3, 0, stacks[i]);
+    int tid = thread_create(&tids[i], test_thread_fn3, stacks[i]);
     printf("Created thread %d (expected id: %d)\n", tid, i);
   }
   // Optionally, join threads here:
@@ -56,11 +56,11 @@ void test_threads_no_args(void) {
   printf( "=== Testing threads with no args @ M2 ===\n" );
   void *stack1 = malloc(PGSIZE);
   void *stack2 = malloc(PGSIZE);
-  int tid1 = thread_create(0, test_thread_fn1, 0, stack1);
-  int tid2 = thread_create(0, test_thread_fn2, 0, stack2);
+  int tid1 = thread_create(0, test_thread_fn1, stack1);
+  int tid2 = thread_create(0, test_thread_fn2, stack2);
   printf( "Created threads %d and %d\n", tid1, tid2);
-  // thread_join();
-  // thread_join();
+  // thread_join(&tid1);
+  // thread_join(&tid2);
 }
 
 void test_spoon(void){

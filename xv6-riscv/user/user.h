@@ -42,7 +42,7 @@ void *memcpy(void *, const void *, uint);
 
 // added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
 int spoon(void*);
-int thread_create(void *args, void (*start_routine)(void*), int *tid, void * stack_pointer);
+int thread_create(void *args, void (*start_routine)(void*), void * stack_pointer);
 int thread_join(int *tid);
 void thread_exit(int *tid);
 

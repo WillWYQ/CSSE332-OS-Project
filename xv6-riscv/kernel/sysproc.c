@@ -102,13 +102,12 @@ sys_spoon(void)
 
 uint64
 sys_thread_create(void) {
-    uint64 args, start_func, tid, stack_pointer;
+    uint64 args, start_func, stack_pointer;
     argaddr(0, &args);
     argaddr(1, &start_func);
-    argaddr(2, &tid);
-    argaddr(3, &stack_pointer);
+    argaddr(2, &stack_pointer);
     
-    return thread_create((void*)args,(void*)start_func,(void*)tid, (void*) stack_pointer);
+    return thread_create((void*)args,(void*)start_func, (void*) stack_pointer);
 }
 
 uint64

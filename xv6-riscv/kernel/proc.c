@@ -702,7 +702,7 @@ spoon(void *arg)
 // }
 
 
-uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * stack_pointer) {
+uint64 thread_create(void *args, void (*start_routine)(void*), void * stack_pointer) {
 
   //want for tid to be unique
   int i, tpid;
@@ -748,8 +748,6 @@ uint64 thread_create(void *args, void (*start_routine)(void*), int *tid, void * 
 
   // TODO: make sure the parent is the real main thread, not the one who created it
   tp->parent = p;
-
-
 
   tp->is_thread = 1;
 
