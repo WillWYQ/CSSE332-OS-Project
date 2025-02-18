@@ -745,6 +745,7 @@ uint64 thread_create(void *args, void (*start_routine)(void*), void * stack_poin
   safestrcpy(tp->name, p->name, sizeof(p->name));
 
   tpid = tp->pid;
+  tp->tid = tp->pid;
 
   // TODO: make sure the parent is the real main thread, not the one who created it
   tp->parent = p;
@@ -779,59 +780,71 @@ uint64 thread_create(void *args, void (*start_routine)(void*), void * stack_poin
 
 }
 
+uint64 thread_join(int *tid) {  // if tid is null, wait for any one; if not, wait for that one
+  struct proc *p = myproc();  // Get the calling process
+  struct proc *t;
 
-uint64 thread_join(int *tid) { // if tid is null, wait for any one, if it is not, wait for that one
-
-  struct proc *p = myproc(); // Get the calling process
-  struct proc *t = p->any_child;
-
+  acquire(&wait_lock);
   acquire(&p->lock);
-
+  t = p->any_child;
   if (!t) {
     // No child threads found
+    printf("Found NON\n");
     release(&p->lock);
-    return -1;
+    return 1;
   }
-  do {
+  printf("Have Child\n");
+  for(;;) {
     acquire(&t->lock);
-
-    if (tid && t->tid != *tid) {
-      // If tid is provided, we are looking for a specific thread and this isn't it, continue
+    printf("Have lock for %d\n", t->tid);
+    if (tid != 0 && *tid != 0 && t->tid != *tid){
+      // Not the thread we want; move to next.
+      printf("not this one, need %d @ %d\n", *tid, t->tid);
       release(&t->lock);
       t = t->next_thread;
       continue;
-    }
-
-    if (t->state == ZOMBIE) {
-
-      // Remove the thread from the linked list
-      if (t->last_thread != t) {
-        t->last_thread->next_thread = t->next_thread;
-        t->next_thread->last_thread = t->last_thread;
-      } else {
-        // Last remaining thread
-        p->any_child = 0;
+    } else if (tid && t->tid == *tid) {
+      printf("is this one, need %d @ %d\n", *tid, t->tid);
+      if (t->state != ZOMBIE) {
+        release(&t->lock);
+        // Sleep until one of our children changes state.
+        sleep(p, &p->lock);
+        continue;
       }
-
-      release(&t->lock);
-      release(&p->lock);
-      freeproc(t);
-
-      return 0;
+    } else { 
+      // tid is NULL: join any thread.
+      printf("not provided find any, @%d\n",t->tid);
+      if (t->state != ZOMBIE) {
+        release(&t->lock);
+        // Advance to next thread; if we've looped back to the head, sleep.
+        t = t->next_thread;
+        if(t == p->any_child)
+          sleep(p, &p->lock);
+        continue;
+      }
     }
 
+    printf("Find sth @%d\n",t->tid);
+
+    // At this point, t->state is ZOMBIE and t matches our criteria.
+    if (t->last_thread != t) {
+      // More than one child in the circular list.
+      t->last_thread->next_thread = t->next_thread;
+      t->next_thread->last_thread = t->last_thread;
+      if (p->any_child == t)
+        p->any_child = t->next_thread;
+    } else {
+      // This was the only child.
+      p->any_child = 0;
+    }
     release(&t->lock);
-    t = t->next_thread;
-    
-  } while (t != p->any_child); 
-  
-
-  // If no zombie threads found, sleep and wait
-  sleep(p, &p->lock);
-  printf("thread_join(%p) - Not implemented yet!\n", tid);
-  return -1;  
+    freeproc(t);
+    break;
+  }
+  release(&p->lock);
+  release(&wait_lock);
+  return 0;
 }
-
 
 // TODO are we have thread id or just kill the current runing thread
 // implemented by Yueqiao Wang on Feb 9 
@@ -873,6 +886,8 @@ uint64 thread_exit(int *tid) {
   t->state = ZOMBIE;
 
   release(&wait_lock);
+
+  printf("SYS: Thread %d exited, waiting for sche()\n",t->tid);
   
   sched();
 

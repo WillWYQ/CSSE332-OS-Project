@@ -59,8 +59,9 @@ void test_threads_no_args(void) {
   int tid1 = thread_create(0, test_thread_fn1, stack1);
   int tid2 = thread_create(0, test_thread_fn2, stack2);
   printf( "Created threads %d and %d\n", tid1, tid2);
-  // thread_join(&tid1);
-  // thread_join(&tid2);
+  thread_join(&tid1);
+  thread_join(&tid2);
+  printf( "Threads %d and %d Exited\n", tid1, tid2);
 }
 
 void test_spoon(void){
