@@ -108,7 +108,7 @@ int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 // added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
 uint64			spoon(void*);
-uint64 thread_create(void *args, void (*start_routine)(void*), void * stack_pointer);
+uint64 thread_create(void *args, void (*start_routine)(void*));
 uint64 thread_join(int *tid);
 uint64 thread_exit(int *tid);
 
@@ -179,6 +179,8 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
+//added by Carl
+uint64 uvmthreadstackmap(struct proc * p);
 
 // plic.c
 void            plicinit(void);

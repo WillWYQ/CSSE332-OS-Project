@@ -702,7 +702,7 @@ spoon(void *arg)
 // }
 
 
-uint64 thread_create(void *args, void (*start_routine)(void*), void * stack_pointer) {
+uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
   //want for tid to be unique
   int i, tpid;
@@ -724,6 +724,8 @@ uint64 thread_create(void *args, void (*start_routine)(void*), void * stack_poin
     return -1;
   }
   tp->sz = p->sz;
+
+  uint64 stack_pointer = uvmthreadstackmap(tp);//this has the kernel create a stack page
 
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);

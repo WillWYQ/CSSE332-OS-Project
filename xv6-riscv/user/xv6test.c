@@ -2,7 +2,7 @@
 #include "kernel/types.h"
 #include "kernel/stat.h"
 #include "user/user.h"
-#include "kernel/riscv.h"
+// #include "kernel/riscv.h"
 
 #define NUM_THREADS 3
 #define LOOP_COUNT 5
@@ -37,11 +37,11 @@ void test_threads_with_args(void){
   printf("=== Testing threads with args @ M2 ===\n");
   
   int tids[NUM_THREADS];
-  void * stacks[NUM_THREADS];
+  // void * stacks[NUM_THREADS];
   for(int i = 0; i < NUM_THREADS; i++){
     tids[i] = i;
-    stacks[i] = malloc(PGSIZE);
-    int tid = thread_create(&tids[i], test_thread_fn3, stacks[i]);
+    // stacks[i] = malloc(PGSIZE);
+    int tid = thread_create(&tids[i], test_thread_fn3);
     printf("Created thread %d (expected id: %d)\n", tid, i);
   }
   // Optionally, join threads here:
@@ -54,10 +54,10 @@ void test_threads_with_args(void){
 // Test: create two threads with no arguments.
 void test_threads_no_args(void) {
   printf( "=== Testing threads with no args @ M2 ===\n" );
-  void *stack1 = malloc(PGSIZE);
-  void *stack2 = malloc(PGSIZE);
-  int tid1 = thread_create(0, test_thread_fn1, stack1);
-  int tid2 = thread_create(0, test_thread_fn2, stack2);
+  // void *stack1 = malloc(PGSIZE);
+  // void *stack2 = malloc(PGSIZE);
+  int tid1 = thread_create(0, test_thread_fn1);//stack1
+  int tid2 = thread_create(0, test_thread_fn2);//stack2
   printf( "Created threads %d and %d\n", tid1, tid2);
   // thread_join(&tid1);
   // thread_join(&tid2);
