@@ -181,6 +181,10 @@ int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 //added by Carl
 uint64 uvmthreadstackmap(struct proc * p);
+int uvmshareallthreadpages(pagetable_t old, pagetable_t new, uint64 sz);
+int uvmsharethreadpage(struct proc* sharer_proc, uint64 va);
+int uvmunsharethreadpage(struct proc* sharer_proc, uint64 va);
+
 
 // plic.c
 void            plicinit(void);

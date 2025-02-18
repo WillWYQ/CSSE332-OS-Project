@@ -2,10 +2,11 @@
 #include "kernel/types.h"
 #include "kernel/stat.h"
 #include "user/user.h"
-// #include "kernel/riscv.h"
 
 #define NUM_THREADS 3
 #define LOOP_COUNT 5
+
+int glob_var = 0;
 
 // Test thread functions with no arguments.
 void test_thread_fn1(void *args) {
@@ -31,6 +32,31 @@ void test_thread_fn3(void *args) {
   }
   thread_exit(0);
 }
+
+//test thread function that uses shared memory
+void test_thread_fn4(void* args){
+    glob_var++;
+    printf("global variable: %d\n", glob_var);
+    thread_exit(0);
+    // while(1);//ending in this because I do not properly free shared memory yet
+}
+
+
+
+
+// Test: create two threads with no arguments.
+void test_threads_with_shared_globals(void) {
+  printf( "=== Testing threads with globals access @ M3 ===\n" );
+  int tid1 = thread_create(0, test_thread_fn4);
+  printf( "Created threads %d\n", tid1);
+  sleep(10);//hopefully first one finishes in this amount of time
+  int tid2 = thread_create(0, test_thread_fn4);
+  printf( "Created threads %d\n", tid2);
+  // while(1);//this ending would also cause the frees to happen I think and that might break things
+  // thread_join(&tid1);
+  // thread_join(&tid2);
+}
+
 
 void test_threads_with_args(void){
   //TODO: talk with team about how the final tid arg works
@@ -78,12 +104,16 @@ int main(int argc, char *argv[]) {
     test_threads_no_args();
     sleep(30);
     test_threads_with_args();
+    sleep(30);
+    test_threads_with_shared_globals();
   } else {
     if (strcmp(argv[1], "noargs") == 0) {
       test_threads_no_args();
     } else if (strcmp(argv[1], "withargs") == 0) {
       test_threads_with_args();
-    } else {
+    } else if(strcmp(argv[1], "withglobs") == 0){
+      test_threads_with_shared_globals();
+    }else {
       printf( "Unknown test: %s\n" , argv[1]);
     }
   }

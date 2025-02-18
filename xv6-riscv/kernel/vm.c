@@ -18,6 +18,10 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+//added for ref counting
+extern int increfcount(uint64);
+extern int decrefcount(uint64);
+
 // Make a direct-map page table for the kernel.
 pagetable_t
 kvmmake(void)
@@ -156,8 +160,10 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   for(;;){
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
-    if(*pte & PTE_V)
-      panic("mappages: remap");
+  
+    increfcount(pa);
+    // if(*pte & PTE_V)
+    //   panic("mappages: remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
     if(a == last)
       break;
@@ -186,8 +192,10 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
-    if(do_free){
-      uint64 pa = PTE2PA(*pte);
+    
+    uint64 pa = PTE2PA(*pte);
+    int count = decrefcount(pa);
+    if(do_free && (count == 1)){
       kfree((void*)pa);
     }
     *pte = 0;
@@ -446,79 +454,102 @@ kalloc a page for our stack
 map that page into the proc's page table
 needs to return a va pointer to the top of the stack
 TODO: share stack memory between threads (cur idea is loop and map it into all the connected procs pagetables)
-TODO: 
 */
-uint64 uvmthreadstackmap(struct proc * p){
+uint64 uvmthreadstackmap(struct proc * t){
     uint flags = PTE_FLAGS(PTE_W);
     
-    uint64 stackVA = PGROUNDUP(p->sz);
+    uint64 stackVA = PGROUNDUP(t->sz);//does this stop working once one of the stacks disappears?
     
     //this should allocate the stack properly unless I need the guard page to be allocated as well but I will just let this be unsafe for right now
-    int newsz = uvmalloc(p->pagetable, p->sz, p->sz + PGSIZE, flags);
-    p->sz = newsz;
+    //TODO: need to use a different method because this doesn't work with multiple threads being able to add to the pagetable
+    //or I could leave it as a memeory leaker because I don't have a free list for virtual addresses and especially not of virtual addresses in chunks the size of a page
+    int newsz = uvmalloc(t->pagetable, t->sz, t->sz + PGSIZE, flags);
+    t->sz = newsz;
+    
     return stackVA;//this should return the start of the stack
 }
-
-
 
 //-------------------------------------------Not sure if I will use these yet-------------------
 /*
 copied uvmcopy
 basically just remap all the pages of one page table to another
 */
-// int sharethreadpage(pagetable_t old, pagetable_t new, uint64 sz){
-//   pte_t *pte;
-//   uint64 i;//pa, 
-//   uint flags;
-//   char *mem;
+int uvmshareallthreadpages(pagetable_t old, pagetable_t new, uint64 sz){
+  pte_t *pte;
+  uint64 pa, i; 
+  uint flags;
 
-//   for(i = 0; i < sz; i += PGSIZE){
-//     if((pte = walk(old, i, 0)) == 0)
-//       panic("uvmcopy: pte should exist");
-//     if((*pte & PTE_V) == 0)
-//       panic("uvmcopy: page not present");
-//     // pa = PTE2PA(*pte);
-//     flags = PTE_FLAGS(*pte);
-//     /*
-//     if((mem = kalloc()) == 0)
-//       goto err;
-//     memmove(mem, (char*)pa, PGSIZE);
-//     */
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walk(old, i, 0)) == 0)
+      panic("uvmcopy: pte should exist");
+    if((*pte & PTE_V) == 0)
+      panic("uvmcopy: page not present");
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
 
-//     if(mappages(new, i, PGSIZE, (uint64)sz, flags) != 0){
-//       kfree(mem);
-//       goto err;
-//     }
-//   }
-//   return 0;
+    if(mappages(new, i, PGSIZE, pa, flags) != 0){
+      goto err;
+    }
+  }
+  return 0;
 
-//  err:
-//   uvmunmap(new, 0, i / PGSIZE, 1);
-//   return -1;
-// }
+ err:
+  uvmunmap(new, 0, i / PGSIZE, 1);
+  return -1;
+}
 
 /*
 similar to share thread page but it calls uvmunmap with do_free = 1
+the va should be sp rounded down so I know I am unmapping the stack
+I think this works as well but can't test it until we have the list implementation
 */
-int unsharethreadpage(){
- return -1;
+int uvmunsharethreadpage(struct proc* sharer_proc, uint64 va){
+  // pagetable_t sharer_table = sharer_proc->pagetable;
+  uint64 sz = sharer_proc->sz;
+  
+  struct proc * sharee_proc = sharer_proc->next_thread;
+  pagetable_t sharee_table;
+
+  while(sharee_proc != sharer_proc){
+    sharee_table = sharee_proc->pagetable;
+
+    uvmunmap(sharee_table, PGROUNDDOWN(va), 1, 1);//table to unmap from, virtual addr, numpages, do_free
+    sharee_proc->sz = sz;//update size
+
+    sharee_proc = sharee_proc->next_thread;//next in list of threads
+  }
+  return 0;
 }
 
-/*stolen from uvmcopy but basically we will just fully remap the page table of one thing to the others*/
-// int
-// uvmsharethreadpages(struct proc *p)//can replace all args with proc struct as long as I set these variables
-// {
-//   pagetable_t old = p->pagetable;
-//   uint64 sz = p->sz;
-//   pagetable_t new;
+/*
+I think this works but I can't test it until we have the list implementation
+*/
+int
+uvmsharethreadpage(struct proc* sharer_proc, uint64 va)//can replace all args with proc struct as long as I set these variables
+{
+  pagetable_t sharer_table = sharer_proc->pagetable;
+  uint64 sz = sharer_proc->sz;
+  
+  struct proc * sharee_proc = sharer_proc->next_thread;
+  pagetable_t sharee_table;
 
-//   struct proc * updatee = p->next_thread;
+  uint64 pa;
+  uint flags;
+  pte_t *pte;
 
-//   while(updatee != p){
-//     new = updatee->pagetable;
-//     sharethreadpage(old, new, sz);
-//     updatee->sz = p->sz;//update size
-//     updatee = updatee->next_thread;//next in list of threads
-//   }
-//   return 0;
-// }
+  if((pte = walk(sharer_table, PGROUNDDOWN(va), 0)) == 0)
+    return -1;
+
+  pa = PTE2PA(*pte);
+  flags = PTE_FLAGS(*pte);
+
+  while(sharee_proc != sharer_proc){
+    sharee_table = sharee_proc->pagetable;
+
+    mappages(sharee_table, va, PGSIZE, pa, flags);
+    sharee_proc->sz = sz;//update size
+
+    sharee_proc = sharee_proc->next_thread;//next in list of threads
+  }
+  return 0;
+}

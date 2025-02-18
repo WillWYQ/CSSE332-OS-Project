@@ -9,10 +9,14 @@
 #include "riscv.h"
 #include "defs.h"
 
+#define FRINDEX(pa) ((uint64)pa - KERNBASE) / PGSIZE
+
 void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
+
+int ref_counts[((PHYSTOP-KERNBASE)/PGSIZE)] = {0};
 
 struct run {
   struct run *next;
@@ -28,6 +32,10 @@ kinit()
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+  
+  //acquire(&kmem.lock);
+  //memset(ref_counts, 0, ((PHYSTOP-KERNBASE)/PGSIZE));
+  //release(&kmem.lock);
 }
 
 void
@@ -38,6 +46,31 @@ freerange(void *pa_start, void *pa_end)
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
     kfree(p);
 }
+
+
+//
+int increfcount(uint64 pa){
+  int index = FRINDEX(pa);
+  //acquire(&kmem.lock);
+  ref_counts[index]++;
+  int res = ref_counts[index];
+  //release(&kmem.lock);
+
+  return res; 
+}
+
+//
+int decrefcount(uint64 pa){
+  int index = FRINDEX(pa);
+  //acquire(&kmem.lock);
+  ref_counts[index]--;
+  int res = ref_counts[index];
+  //release(&kmem.lock);
+
+  return res;
+}
+
+
 
 // Free the page of physical memory pointed at by pa,
 // which normally should have been returned by a
@@ -51,15 +84,19 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  // Fill with junk to catch dangling refs.
-  memset(pa, 1, PGSIZE);
+  decrefcount((uint64) pa);
 
-  r = (struct run*)pa;
+  //if(current_count == 0){
+    // Fill with junk to catch dangling refs.
+    memset(pa, 1, PGSIZE);
 
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+    r = (struct run*)pa;
+
+    acquire(&kmem.lock);
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+    release(&kmem.lock);
+  //}
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -78,5 +115,8 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+
+  increfcount((uint64) r);
+
   return (void*)r;
 }

@@ -717,15 +717,18 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
   // acquire(&tp->lock); done in allocproc
 
-  // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, tp->pagetable, p->sz) < 0){
+  // map user memory from "parent" to child.
+  if(uvmshareallthreadpages(p->pagetable, tp->pagetable, p->sz) < 0){//used to be uvmcopy
     freeproc(tp);
     release(&tp->lock);
     return -1;
   }
   tp->sz = p->sz;
 
-  uint64 stack_pointer = uvmthreadstackmap(tp);//this has the kernel create a stack page
+  //this has the kernel create a stack page and add it to the pagetable and updates sz
+  uint64 stack_pointer = uvmthreadstackmap(tp);
+
+  // uvmsharethreadpage(tp, stack_pointer); //should be good to just use once list implementation is good
 
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);
