@@ -37,8 +37,8 @@ void test_thread_fn3(void *args) {
 void test_thread_fn4(void* args){
     glob_var++;
     printf("global variable: %d\n", glob_var);
-    thread_exit(0);
-    // while(1);//ending in this because I do not properly free shared memory yet
+    // thread_exit(0);
+    while(1);//ending in this because I do not properly free shared memory yet
 }
 
 
