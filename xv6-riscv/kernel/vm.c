@@ -5,6 +5,9 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+//added
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -437,3 +440,85 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+/*
+kalloc a page for our stack
+map that page into the proc's page table
+needs to return a va pointer to the top of the stack
+TODO: share stack memory between threads (cur idea is loop and map it into all the connected procs pagetables)
+TODO: 
+*/
+uint64 uvmthreadstackmap(struct proc * p){
+    uint flags = PTE_FLAGS(PTE_W);
+    
+    uint64 stackVA = PGROUNDUP(p->sz);
+    
+    //this should allocate the stack properly unless I need the guard page to be allocated as well but I will just let this be unsafe for right now
+    int newsz = uvmalloc(p->pagetable, p->sz, p->sz + PGSIZE, flags);
+    p->sz = newsz;
+    return stackVA;//this should return the start of the stack
+}
+
+
+
+//-------------------------------------------Not sure if I will use these yet-------------------
+/*
+copied uvmcopy
+basically just remap all the pages of one page table to another
+*/
+// int sharethreadpage(pagetable_t old, pagetable_t new, uint64 sz){
+//   pte_t *pte;
+//   uint64 i;//pa, 
+//   uint flags;
+//   char *mem;
+
+//   for(i = 0; i < sz; i += PGSIZE){
+//     if((pte = walk(old, i, 0)) == 0)
+//       panic("uvmcopy: pte should exist");
+//     if((*pte & PTE_V) == 0)
+//       panic("uvmcopy: page not present");
+//     // pa = PTE2PA(*pte);
+//     flags = PTE_FLAGS(*pte);
+//     /*
+//     if((mem = kalloc()) == 0)
+//       goto err;
+//     memmove(mem, (char*)pa, PGSIZE);
+//     */
+
+//     if(mappages(new, i, PGSIZE, (uint64)sz, flags) != 0){
+//       kfree(mem);
+//       goto err;
+//     }
+//   }
+//   return 0;
+
+//  err:
+//   uvmunmap(new, 0, i / PGSIZE, 1);
+//   return -1;
+// }
+
+/*
+similar to share thread page but it calls uvmunmap with do_free = 1
+*/
+int unsharethreadpage(){
+ return -1;
+}
+
+/*stolen from uvmcopy but basically we will just fully remap the page table of one thing to the others*/
+// int
+// uvmsharethreadpages(struct proc *p)//can replace all args with proc struct as long as I set these variables
+// {
+//   pagetable_t old = p->pagetable;
+//   uint64 sz = p->sz;
+//   pagetable_t new;
+
+//   struct proc * updatee = p->next_thread;
+
+//   while(updatee != p){
+//     new = updatee->pagetable;
+//     sharethreadpage(old, new, sz);
+//     updatee->sz = p->sz;//update size
+//     updatee = updatee->next_thread;//next in list of threads
+//   }
+//   return 0;
+// }
