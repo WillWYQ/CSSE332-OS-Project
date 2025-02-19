@@ -197,7 +197,7 @@ void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
 
 // list.c
-void            init_proc(struct proc *);
+void            init_list(struct proc *);
 void            list_add(struct proc *, struct proc *);
 void            list_add_tail(struct proc *, struct proc *);
 void            list_del(struct proc *);
