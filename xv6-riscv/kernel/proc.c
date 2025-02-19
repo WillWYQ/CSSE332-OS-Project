@@ -787,49 +787,92 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
 }
 
-uint64 thread_join(int *tid) {  // if tid is null, wait for any one; if not, wait for that one
+uint64 thread_join(int join_tid) {  // if tid is null, wait for any one, if not, wait for that one
   struct proc *p = myproc();  // Get the calling process
   struct proc *t;
 
-  acquire(&wait_lock);
+  
   acquire(&p->lock);
+  acquire(&wait_lock);
+
   t = p->any_child;
   if (!t) {
     // No child threads found
     printf("Found NON\n");
-    release(&p->lock);
+    release(&wait_lock);
+    // release(&p->lock);
     return 1;
   }
-  printf("Have Child\n");
+
+  printf("Have Child with join_tid=%d\n",join_tid);
+
   for(;;) {
+    
+    printf("In Main Loop\n");
+
     acquire(&t->lock);
+
     printf("Have lock for %d\n", t->tid);
-    if (tid != 0 && *tid != 0 && t->tid != *tid){
+
+
+    
+    if (join_tid != 0 && t->tid != join_tid) {
       // Not the thread we want; move to next.
-      printf("not this one, need %d @ %d\n", *tid, t->tid);
+      printf("not this one, need %d @ %d\n", join_tid, t->tid);
       release(&t->lock);
       t = t->next_thread;
       continue;
-    } else if (tid && t->tid == *tid) {
-      printf("is this one, need %d @ %d\n", *tid, t->tid);
+    } 
+
+    else if (join_tid != 0 && t->tid == join_tid) 
+    {
+        printf("is this one, need %d @ %d\n", join_tid, t->tid);
+
       if (t->state != ZOMBIE) {
-        release(&t->lock);
-        // Sleep until one of our children changes state.
-        sleep(p, &p->lock);
-        continue;
+          printf("%d is not ZOMBIE yet\n",t->tid);
+
+        while (t->state != ZOMBIE) {
+            printf("in the zombie waiting loop now\n");
+
+          release(&t->lock);
+          // release(&p->lock);
+            printf("locks released\n");
+
+
+          sleep(p, &wait_lock);
+            printf("waked up\n");
+
+          // acquire(&p->lock);
+          acquire(&t->lock);
+            printf("locks acquired\n");
+        }
+
       }
-    } else { 
-      // tid is NULL: join any thread.
-      printf("not provided find any, @%d\n",t->tid);
+
+
+      printf("Breaking\n");
+
+      break; 
+    } 
+    else 
+    {
+      // join_tid is 0: join any thread.
+      printf("not provided, find any, @%d\n", t->tid);
       if (t->state != ZOMBIE) {
         release(&t->lock);
-        // Advance to next thread; if we've looped back to the head, sleep.
         t = t->next_thread;
-        if(t == p->any_child)
-          sleep(p, &p->lock);
+        if (t == p->any_child) {
+          // Release p->lock before sleeping
+          release(&p->lock);
+          sleep(p, &wait_lock);
+          // Reacquire p->lock after sleep returns
+          acquire(&p->lock);
+        }
         continue;
       }
+      break;
     }
+    printf("Broke\n");
 
     printf("Find sth @%d\n",t->tid);
 
@@ -848,8 +891,9 @@ uint64 thread_join(int *tid) {  // if tid is null, wait for any one; if not, wai
     freeproc(t);
     break;
   }
-  release(&p->lock);
   release(&wait_lock);
+  release(&p->lock);
+  
   return 0;
 }
 
