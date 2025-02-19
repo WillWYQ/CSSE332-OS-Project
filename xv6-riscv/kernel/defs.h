@@ -185,7 +185,6 @@ int uvmshareallthreadpages(pagetable_t old, pagetable_t new, uint64 sz);
 int uvmsharethreadpage(struct proc* sharer_proc, uint64 va);
 int uvmunsharethreadpage(struct proc* sharer_proc, uint64 va);
 
-
 // plic.c
 void            plicinit(void);
 void            plicinithart(void);
@@ -196,6 +195,13 @@ void            plic_complete(int);
 void            virtio_disk_init(void);
 void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
+
+// list.c
+void            init_proc(struct proc *);
+void            list_add(struct proc *, struct proc *);
+void            list_add_tail(struct proc *, struct proc *);
+void            list_del(struct proc *);
+void            list_del_init(struct proc *);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
