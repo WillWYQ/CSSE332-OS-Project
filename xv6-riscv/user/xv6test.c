@@ -90,6 +90,15 @@ void test_threads_no_args(void) {
   printf( "Threads %d and %d Exited\n", tid1, tid2);
 }
 
+// Test: create one thread with no arguments for thread_join developement.
+void test_thread_no_args_join(void) {
+  printf( "=== Testing threads with no args @ M2 ===\n" );
+  int tid1 = thread_create(0, test_thread_fn1);//stack1
+  printf( "Created threads %d\n", tid1);
+  thread_join(&tid1);
+  printf( "Threads %d Exited\n", tid1);
+}
+
 void test_spoon(void){
   printf("===============Spoon & M1==============\n");
   uint64 p = 0xdeadbeef;
@@ -114,7 +123,9 @@ int main(int argc, char *argv[]) {
       test_threads_with_args();
     } else if(strcmp(argv[1], "withglobs") == 0){
       test_threads_with_shared_globals();
-    }else {
+    } else if(strcmp(argv[1], "jointest") == 0){
+      test_thread_no_args_join();
+    } else {
       printf( "Unknown test: %s\n" , argv[1]);
     }
   }
