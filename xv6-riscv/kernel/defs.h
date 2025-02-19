@@ -201,7 +201,6 @@ void            init_list(struct proc *);
 void            list_add(struct proc *, struct proc *);
 void            list_add_tail(struct proc *, struct proc *);
 void            list_del(struct proc *);
-void            list_del_init(struct proc *);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
