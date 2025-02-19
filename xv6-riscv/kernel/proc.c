@@ -715,8 +715,6 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
     return -1;
   }
 
-  // acquire(&tp->lock); done in allocproc
-
   // map user memory from "parent" to child.
   if(uvmshareallthreadpages(p->pagetable, tp->pagetable, p->sz) < 0){//used to be uvmcopy
     freeproc(tp);
@@ -752,9 +750,15 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   tpid = tp->pid;
   tp->tid = tp->pid;
 
-  // TODO: make sure the parent is the real main thread, not the one who created it
+  //TODO: make sure the parent is the real main thread, not the one who created it
+  //if the thing that created me has isthread then I want it's parent 
+  //because if isthread is true then that means its not the main thread
+  //because it has a main thread above it
   tp->parent = p;
 
+  //This should be fine but need to figure out why is this not working
+  //
+  //Sets the isthread flag
   tp->is_thread = 1;
 
   // Update parent's thread list.
@@ -762,18 +766,16 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   if(p->any_child == 0){
     // No child exists yet.
     p->any_child = tp;
-    tp->next_thread = tp; // Circular list: next points to self.
-    tp->last_thread = tp; // Circular list: last points to self.
+    // tp->next_thread = tp; // Circular list: next points to self.
+    // tp->last_thread = tp; // Circular list: last points to self.
+    
+    //this initializes the new thread's list
+    init_list(tp);
   } else {
-    // Parent already has at least one child.
-    // p->any_child points to the first child.
-    struct proc *first = p->any_child;
-    struct proc *last = first->last_thread; // Last child in the circular list.
-    // Insert the new thread at the tail.
-    tp->last_thread = last;
-    tp->next_thread = first;
-    last->next_thread = tp;
-    first->last_thread = tp;
+    // // Parent already has at least one child.
+    // // p->any_child points to the first child.
+    //Adds a new thread to the tail of the list.
+    list_add_tail(p->any_child,tp);
   }
   release(&p->lock);
 
