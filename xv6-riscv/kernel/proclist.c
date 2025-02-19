@@ -2,9 +2,9 @@
 #include "types.h"
 #include "riscv.h"
 #include "param.h"
-#include "defs.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "defs.h"
 
 //This is when the main thread is created
 void init_list(struct proc *list)
