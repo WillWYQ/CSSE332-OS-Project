@@ -197,9 +197,9 @@ void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
 
 // proclist.c
-void            init_list(struct proc *list);
-void            list_add_tail(struct proc *head, struct proc *new);
-void            list_del(struct proc *entry);
+void            init_list(struct proc* list);
+void            list_add_tail(struct proc* head, struct proc *new);
+void            list_del(struct proc* entry);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
