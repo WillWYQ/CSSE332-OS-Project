@@ -18,6 +18,10 @@ struct spinlock pid_lock;
 extern void forkret(void);
 static void freeproc(struct proc *p);
 
+extern void init_list(struct proc *list);
+extern void list_add_tail(struct proc *head, struct proc *new);
+extern void list_del(struct proc *entry);
+
 extern char trampoline[]; // trampoline.S
 
 // helps ensure that wakeups of wait()ing
