@@ -508,7 +508,7 @@ the va should be sp rounded down so I know I am unmapping the stack
 I think this works as well but can't test it until we have the list implementation
 */
 int uvmunsharethreadpage(struct proc* sharer_proc, uint64 va){
-  pagetable_t sharer_table = sharer_proc->pagetable;
+  // pagetable_t sharer_table = sharer_proc->pagetable;
   uint64 sz = sharer_proc->sz;
   
   struct proc* sharee_proc = sharer_proc->next_thread;
