@@ -456,7 +456,7 @@ needs to return a va pointer to the top of the stack
 TODO: share stack memory between threads (cur idea is loop and map it into all the connected procs pagetables)
 */
 uint64 uvmthreadstackmap(struct proc * t){
-    uint flags = PTE_FLAGS(PTE_W);
+    uint flags = PTE_W | PTE_U;
     
     uint64 stackVA = PGROUNDUP(t->sz);//does this stop working once one of the stacks disappears?
     
@@ -464,9 +464,13 @@ uint64 uvmthreadstackmap(struct proc * t){
     //TODO: need to use a different method because this doesn't work with multiple threads being able to add to the pagetable
     //or I could leave it as a memeory leaker because I don't have a free list for virtual addresses and especially not of virtual addresses in chunks the size of a page
     int newsz = uvmalloc(t->pagetable, t->sz, t->sz + PGSIZE, flags);
+    if(newsz == 0){
+      // Allocation failed.
+      return 0;
+    }
     t->sz = newsz;
     
-    return stackVA;//this should return the start of the stack
+    return  stackVA + PGSIZE;//this should return the start of the stack
 }
 
 //-------------------------------------------Not sure if I will use these yet-------------------

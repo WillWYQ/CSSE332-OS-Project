@@ -135,12 +135,11 @@ void test_thread_no_args_join(void) {
   thread_join(&test_thread_no_args_join_tid1);
   printf( "Threads %d Exited\n", test_thread_no_args_join_tid1);
 
-  int test_thread_no_args_join_tid2 = thread_create(0, test_thread_fn1);//stack1
+  test_thread_no_args_join_tid2 = thread_create(0, test_thread_fn1);//stack1
   printf( "Created threads %d\n", test_thread_no_args_join_tid2);
   // sleep(20);//this will make sure that it finishes after the mainthread has slept due to the thread_join
   thread_join(&test_thread_no_args_join_tid2);
   printf( "Threads %d Exited\n", test_thread_no_args_join_tid2);
-
   return;
 }
 
@@ -157,10 +156,13 @@ void test_spoon(void){
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     test_threads_no_args();
+    printf( "test_threads_no_args Test Finished\n");
     sleep(30);
     test_threads_with_args();
+    printf( "test_threads_with_args Test Finished\n");
     sleep(30);
     test_threads_with_shared_globals();
+    printf( "test_threads_with_shared_globals Test Finished\n");
   } else {
     if (strcmp(argv[1], "noargs") == 0) {
       test_threads_no_args();
@@ -176,8 +178,9 @@ int main(int argc, char *argv[]) {
       printf( "Unknown test: %s\n" , argv[1]);
     }
   }
-  printf("made it to end of main");
+  printf("All Finished\n");
   // while(1);
+  sleep(10);
   exit(0);
   // return 0;
 }
