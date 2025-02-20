@@ -534,9 +534,8 @@ uvmsharethreadpage(struct proc* sharer_proc, uint64 va)//can replace all args wi
   pagetable_t sharer_table = sharer_proc->pagetable;
   uint64 sz = sharer_proc->sz;
   
-  struct proc * sharee_proc = sharer_proc->parent;
-
-  pagetable_t sharee_table;
+  // struct proc * sharee_proc = sharer_proc->parent;
+  // pagetable_t sharee_table;
   
 
   uint64 pa;
@@ -549,7 +548,11 @@ uvmsharethreadpage(struct proc* sharer_proc, uint64 va)//can replace all args wi
   pa = PTE2PA(*pte);
   flags = PTE_FLAGS(*pte);
 
+  //share with main thread
+  mappages(sharer_proc->parent->pagetable, PGROUNDDOWN(va), PGSIZE, pa, flags);//this isn't working because I am writing to memory that is not in my address space? (someone elses pagetable)
+  sharer_proc->parent->sz = sz;//update size
 
+  //share with siblings
   while(sharee_proc != sharer_proc){
     sharee_table = sharee_proc->pagetable;//this line is a problem when I'm in a loop but not when I am out of the loop?
 
