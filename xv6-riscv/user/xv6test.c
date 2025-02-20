@@ -35,9 +35,9 @@ void test_thread_fn2(void *args) {
 
 // Test thread function that accepts an argument.
 void test_thread_fn3(void *args) {
-  int tid = *(int *)args;
+  // int tid = *(int *)args;
   for (int i = 0; i < LOOP_COUNT; i++) {
-    printf( "fn3 (tid %d) (A: iteration %d\n" , tid, i);
+    printf( "fn3 (tid %d) (A: iteration %d\n" , *(int *)args, i);
   }
   thread_exit(0);
 }
@@ -100,15 +100,13 @@ void test_threads_with_args(void){
   int tids[NUM_THREADS];
   // void * stacks[NUM_THREADS];
   for(int i = 0; i < NUM_THREADS; i++){
-    tids[i] = i;
-    // stacks[i] = malloc(PGSIZE);
-    int tid = thread_create(&tids[i], test_thread_fn3);
-    printf("Created thread %d (expected id: %d)\n", tid, i);
+    tids[i] = thread_create(&tids[i], test_thread_fn3);
+    printf("Created thread %d\n", tids[i], i);
   }
   // Optionally, join threads here:
-  // for(int i = 0;i < NUM_THREADS; i++){
-  //   thread_join();
-  // }
+  for(int i = 0;i < NUM_THREADS; i++){
+    thread_join(&tids[i]);
+  }
 }
 
 
