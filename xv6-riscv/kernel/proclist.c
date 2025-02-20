@@ -17,14 +17,12 @@ void print_list_inord(struct proc *head){
 
   struct proc *current = head;
   printf("In-Order List: ");
-  struct proc *current = head;
 
   do{
     printf("%d->",current->tid);
     current = current->next_thread;
-  }while(current!=head){
-    printf("(head)\n")
-  }
+  }while(current!=head);
+    printf("(head)\n");
 }
 
 //Helper Debuger methods I need to print the list
@@ -41,9 +39,8 @@ void print_list_rev(struct proc *head){
   do{
     printf("%d->",current->tid);
     current = current->last_thread;
-  }while(current!=head->last_thread){
-    printf("(head)\n")
-  }
+  }while(current!=head->last_thread);
+    printf("(head)\n");
 }
 
 
@@ -100,6 +97,7 @@ void list_del(struct proc *entry)
   if(entry->next_thread==entry && entry->last_thread==entry){
     //
     entry->last_thread = entry->next_thread = entry;
+    
   }else{
     
     __list_del(entry->last_thread, entry->next_thread);
