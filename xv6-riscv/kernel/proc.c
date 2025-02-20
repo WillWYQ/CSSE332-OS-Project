@@ -869,49 +869,6 @@ uint64 thread_join(int * join_tid) {
 // implemented by Yueqiao Wang on Feb 9 
 uint64 thread_exit(int *tid) {
 
-  //---------------------------------------Carl's Code
-  // struct proc *t = myproc();
-
-  // if(t == initproc)
-  //   panic("init exiting");
-
-  // // Close all open files.
-  // for(int fd = 0; fd < NOFILE; fd++){
-  //   if(t->ofile[fd]){
-  //     struct file *f = t->ofile[fd];
-  //     fileclose(f);
-  //     t->ofile[fd] = 0;
-  //   }
-  // }
-
-  // begin_op();
-  // iput(t->cwd);
-  // end_op();
-  // t->cwd = 0;
-
-  // acquire(&wait_lock);
-
-  // // Give any children to init.
-  // // reparent(t);//shouldn't need to do this but lets see what it changes
-
-  // // Parent might be sleeping in wait(). or in our case thread_join
-  // wakeup(t->parent);//this will wakeup mainthread
-
-  // // TODO: Modify exit() in kernel/proc.c to terminate all threads when the main process exits.
-
-  // acquire(&t->lock);
-
-  // // p->xstate = status;//I'm just going to ignore this because we aren't allowing stat struct stuff on our threads
-  // t->state = ZOMBIE;
-
-  // release(&wait_lock);
-
-  // // Jump into the scheduler, never to return.
-  // sched();
-  // panic("zombie exit");
-
-
-
   //----------------------------------------------------Yueqiao's Code
   struct proc *t = myproc();
 
@@ -930,17 +887,32 @@ uint64 thread_exit(int *tid) {
   acquire(&t->lock);
   acquire(&wait_lock);
   
+  //this should handle the function to handle the removal of threads
+  //while also updating the next and last thread pointers
+  list_del(t);
+
+  //   // Handle thread list updates
+  // if (t->last_thread != t) {
+  //   t->last_thread->next_thread = t->next_thread;
+  //   t->next_thread->last_thread = t->last_thread;
+  //   //see if I am just updating the list by adding a
+  //   //tail to this but not completely sure
+  // } else {
+  //       // If this is the only thread, update parent process accordingly
+  //   acquire(&p->lock);
+  //   if (p->any_child == t) {
+  //     p->any_child = (t->next_thread != t) ? t->next_thread : 0;
+  //   }
+  //   release(&p->lock);
+  // }
     // Handle thread list updates
-  if (t->last_thread != t) {
-    t->last_thread->next_thread = t->next_thread;
-    t->next_thread->last_thread = t->last_thread;
-  } else {
-        // If this is the only thread, update parent process accordingly
-    acquire(&p->lock);
-    if (p->any_child == t) {
-      p->any_child = (t->next_thread != t) ? t->next_thread : 0;
-    }
-    release(&p->lock);
+  if (t->next_thread == t) {
+      // If this is the only thread, update parent process accordingly
+      acquire(&p->lock);
+      if (p->any_child == t) {
+        p->any_child = 0;
+      }
+      release(&p->lock);
   }
 
   wakeup(p);  // Wake up any thread waiting in thread_join()
