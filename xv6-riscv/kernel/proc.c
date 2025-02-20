@@ -801,7 +801,7 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   }
 
   //needs to be after we setup the linked list
-  uvmsharethreadpage(tp, stack_pointer); //should be good to just use once list implementation is good
+  //uvmsharethreadpage(tp, stack_pointer); //should be good to just use once list implementation is good
   release(&p->lock);
 
   tp->state = RUNNABLE;

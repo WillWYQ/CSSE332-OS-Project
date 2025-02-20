@@ -55,6 +55,7 @@ void test_thread_fn5(void* args){
   int some_num = 943875243;
   printf("stack variable: %d at addr: %p\n", some_num, &some_num);
   pointer_to_a_threads_stack = &some_num;
+  sleep(30);
   thread_exit(0);
   // while(1);//ending in this because I do not properly free shared memory yet
 }
