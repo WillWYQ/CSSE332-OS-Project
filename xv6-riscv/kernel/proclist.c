@@ -35,8 +35,29 @@ void list_add_tail(struct proc *head, struct proc *new)
   __list_add(new, head->last_thread, head);
 }
 
+// void list_del(struct proc *entry)
+// {
+//   __list_del(entry->last_thread, entry->next_thread);
+//   entry->last_thread = entry->next_thread = entry;
+// }
+
+//
 void list_del(struct proc *entry)
-{
-  __list_del(entry->last_thread, entry->next_thread);
-  entry->last_thread = entry->next_thread = entry;
+{ 
+  //I guess I am sure if this is necessaey but I think
+  //I need to check to see if the proc is null
+  if(!entry){
+    return;
+  }
+
+  //this is when theres only one child in the list
+  if(entry->next_thread==entry && entry->last_thread==entry){
+    //
+    entry->last_thread = entry->next_thread = entry;
+  }else{
+    
+    __list_del(entry->last_thread, entry->next_thread);
+    entry->last_thread = entry->next_thread = entry;}
+
+  
 }

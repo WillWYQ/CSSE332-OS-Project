@@ -706,6 +706,17 @@ spoon(void *arg)
 // }
 
 
+//I decided to make a helper function to set the parent right so that 
+//when a thead is created the parent is set correctly
+
+//should essentially take a thread and go up the links until it 
+//finds the parent then returns the actual paren
+struct proc* find_parent_thread(struct proc *p){
+  while(p->is_thread){
+    p= p->parent;}
+    return p;
+}
+
 uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
   //want for tid to be unique
@@ -760,7 +771,11 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   //if the thing that created me has isthread then I want it's parent 
   //because if isthread is true then that means its not the main thread
   //because it has a main thread above it
-  tp->parent = p;
+  
+  //Now this should make sure that the new child will not 
+  //be the parent but the actual parent that gave birth to
+  //the child will be the main thread
+  tp->parent = find_parent_thread(p);
 
   //This should be fine but need to figure out why is this not working
   //
