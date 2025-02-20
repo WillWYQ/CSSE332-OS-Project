@@ -109,7 +109,7 @@ void            procdump(void);
 // added by Yueqiao Wang on Feb 3, 2025 based on instruction from https://www.rose-hulman.edu/class/csse/csse332/2425b/labs/milestone1/
 uint64          spoon(void*);
 uint64          thread_create(void *args, void (*start_routine)(void*));
-uint64          thread_join(int join_tid);
+uint64          thread_join(int *join_tid);
 uint64          thread_exit(int *tid);
 
 

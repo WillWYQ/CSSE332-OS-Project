@@ -736,9 +736,11 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   *(tp->trapframe) = *(p->trapframe);
 
   // Cause fork to return 0 in the child.
+  // printf("original epc: %p\n",(int*) tp->trapframe->epc);
   tp->trapframe->epc = (uint64) start_routine;//thread_fn;
   tp->trapframe->sp = (uint64) stack_pointer;
   tp->trapframe->a0 = (uint64) args;//if the code I enter into isn't expecting a return value it won't use this as a return value it will use it as the normal arg register
+  // printf("original ra: %p\n",(int*) tp->trapframe->ra);
   // tp->trapframe->a1 = (uint64) start_routine;
   // tp->trapframe->a2 = (uint64) tid;
 
@@ -791,161 +793,269 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
 }
 
-uint64 thread_join(int join_tid) {  // if tid is null, wait for any one, if not, wait for that one
-  struct proc *p = myproc();  // Get the calling process
-  struct proc *t;
+uint64 thread_join(int * join_tid) {  // if tid is null, wait for any one, if not, wait for that one
+  //---------------------------------------------------Carl's Code
+  struct proc *ct;//child thread
+  int pid, threadtojoinexists;//shouldn't need to worry about have kids bc threads shouldn't have kids
+  struct proc *mt = myproc();//main thread
+  int tid;// I need this for a thing to copy into
 
-  
-  acquire(&p->lock);
+  //all page tables should be equivalent and the join tid should either be in globals or the main threads stack so this should work
+  copyin(mt->pagetable, (char*) &tid, (uint64) join_tid, (uint64) sizeof(int));//get tid to match from user space
+
+  printf("thread join called with %d as tid inside function\n", tid);
+
   acquire(&wait_lock);
 
-  t = p->any_child;
-  if (!t) {
-    // No child threads found
-    printf("Found NON\n");
+  for(;;){
+    // Scan through table looking for exited children.
+    printf("thread join of mainthread: %d is checking for if child with tid:%d exited (inloop)\n", mt->pid, tid);
+    threadtojoinexists = 0;
+    for(ct = proc; ct < &proc[NPROC]; ct++){
+      if(ct->parent == mt)
+        threadtojoinexists = 1;
+
+      if(ct->pid == tid){//this if statement can probably be replaced wit  == ct->pid(itstid)//used to be ct->parent == mt
+        // make sure the child isn't still in exit() or swtch().
+        acquire(&ct->lock);
+
+        if(ct->state == ZOMBIE){
+          // Found one.
+          pid = ct->pid;
+          //this was for sending stuff to the stat struct when a child is done so we are not gonna be using it in this
+        //   if(addr != 0 && copyout(mt->pagetable, addr, (char *)&ct->xstate, 
+        //     sizeof(ct->xstate)) < 0) {
+        //     release(&ct->lock);
+        //   release(&wait_lock);
+        //   return -1;
+        // }
+        
+        //freeproc will free all the pages which is not what I want
+        //freeproc(ct);//do I want to do this? I think yes it looks like it will unmap all the pages which should properly free stuff only worried about some edge cases with stacks
+        release(&ct->lock);
+        release(&wait_lock);
+        printf("reaches end of successful thread_join with %d as the tid\n", pid);
+        return pid;
+      }
+      release(&ct->lock);
+    }
+  }
+
+    // No point waiting if we don't have any children.
+  if(!threadtojoinexists || killed(mt)){
     release(&wait_lock);
-    // release(&p->lock);
-    return 1;
+    return -1;
   }
 
-  printf("Have Child with join_tid=%d\n",join_tid);
-
-  for(;;) {
-    
-    printf("In Main Loop\n");
-
-    acquire(&t->lock);
-
-    printf("Have lock for %d\n", t->tid);
-
-
-    
-    if (join_tid != 0 && t->tid != join_tid) {
-      // Not the thread we want; move to next.
-      printf("not this one, need %d @ %d\n", join_tid, t->tid);
-      release(&t->lock);
-      t = t->next_thread;
-      continue;
-    } 
-
-    else if (join_tid != 0 && t->tid == join_tid) 
-    {
-        printf("is this one, need %d @ %d\n", join_tid, t->tid);
-
-      if (t->state != ZOMBIE) {
-          printf("%d is not ZOMBIE yet\n",t->tid);
-
-        while (t->state != ZOMBIE) {
-            printf("in the zombie waiting loop now\n");
-
-          release(&t->lock);
-          // release(&p->lock);
-            printf("locks released\n");
-
-
-          sleep(p, &wait_lock);
-            printf("waked up\n");
-
-          // acquire(&p->lock);
-          acquire(&t->lock);
-            printf("locks acquired\n");
-        }
-
-      }
-
-
-      printf("Breaking\n");
-
-      break; 
-    } 
-    else 
-    {
-      // join_tid is 0: join any thread.
-      printf("not provided, find any, @%d\n", t->tid);
-      if (t->state != ZOMBIE) {
-        release(&t->lock);
-        t = t->next_thread;
-        if (t == p->any_child) {
-          // Release p->lock before sleeping
-          release(&p->lock);
-          sleep(p, &wait_lock);
-          // Reacquire p->lock after sleep returns
-          acquire(&p->lock);
-        }
-        continue;
-      }
-      break;
-    }
-    printf("Broke\n");
-
-    printf("Find sth @%d\n",t->tid);
-
-    // At this point, t->state is ZOMBIE and t matches our criteria.
-    if (t->last_thread != t) {
-      // More than one child in the circular list.
-      t->last_thread->next_thread = t->next_thread;
-      t->next_thread->last_thread = t->last_thread;
-      if (p->any_child == t)
-        p->any_child = t->next_thread;
-    } else {
-      // This was the only child.
-      p->any_child = 0;
-    }
-    release(&t->lock);
-    freeproc(t);
-    break;
+    // Wait for a child to exit.
+    sleep(mt, &wait_lock);  //DOC: wait-sleep
   }
-  release(&wait_lock);
-  release(&p->lock);
   
-  return 0;
+  
+  
+  
+  
+  //----------------------------------------------------Yueqiao's Code
+  
+  // struct proc *p = myproc();  // Get the calling process
+  // struct proc *t;
+
+  
+  // acquire(&p->lock);
+  // acquire(&wait_lock);
+
+  // t = p->any_child;
+  // if (!t) {
+  //   // No child threads found
+  //   printf("Found NON\n");
+  //   release(&wait_lock);
+  //   // release(&p->lock);
+  //   return 1;
+  // }
+
+  // printf("Have Child with join_tid=%d\n",join_tid);
+
+  // for(;;) {
+    
+  //   printf("In Main Loop\n");
+
+  //   acquire(&t->lock);
+
+  //   printf("Have lock for %d\n", t->tid);
+
+
+    
+  //   if (join_tid != 0 && t->tid != join_tid) {
+  //     // Not the thread we want; move to next.
+  //     printf("not this one, need %d @ %d\n", join_tid, t->tid);
+  //     release(&t->lock);
+  //     t = t->next_thread;
+  //     continue;
+  //   } 
+
+  //   else if (join_tid != 0 && t->tid == join_tid) 
+  //   {
+  //       printf("is this one, need %d @ %d\n", join_tid, t->tid);
+
+  //     if (t->state != ZOMBIE) {
+  //         printf("%d is not ZOMBIE yet\n",t->tid);
+
+  //       while (t->state != ZOMBIE) {
+  //           printf("in the zombie waiting loop now\n");
+
+  //         release(&t->lock);
+  //         // release(&p->lock);
+  //           printf("locks released\n");
+
+
+  //         sleep(p, &wait_lock);
+  //           printf("waked up\n");
+
+  //         // acquire(&p->lock);
+  //         acquire(&t->lock);
+  //           printf("locks acquired\n");
+  //       }
+
+  //     }
+
+
+  //     printf("Breaking\n");
+
+  //     break; 
+  //   } 
+  //   else 
+  //   {
+  //     // join_tid is 0: join any thread.
+  //     printf("not provided, find any, @%d\n", t->tid);
+  //     if (t->state != ZOMBIE) {
+  //       release(&t->lock);
+  //       t = t->next_thread;
+  //       if (t == p->any_child) {
+  //         // Release p->lock before sleeping
+  //         release(&p->lock);
+  //         sleep(p, &wait_lock);
+  //         // Reacquire p->lock after sleep returns
+  //         acquire(&p->lock);
+  //       }
+  //       continue;
+  //     }
+  //     break;
+  //   }
+  //   printf("Broke\n");
+
+  //   printf("Find sth @%d\n",t->tid);
+
+  //   // At this point, t->state is ZOMBIE and t matches our criteria.
+  //   if (t->last_thread != t) {
+  //     // More than one child in the circular list.
+  //     t->last_thread->next_thread = t->next_thread;
+  //     t->next_thread->last_thread = t->last_thread;
+  //     if (p->any_child == t)
+  //       p->any_child = t->next_thread;
+  //   } else {
+  //     // This was the only child.
+  //     p->any_child = 0;
+  //   }
+  //   release(&t->lock);
+  //   freeproc(t);
+  //   break;
+  // }
+  // release(&wait_lock);
+  // release(&p->lock);
+  
+  // return 0;
 }
 
 // TODO are we have thread id or just kill the current runing thread
 // implemented by Yueqiao Wang on Feb 9 
 uint64 thread_exit(int *tid) {
+  
+  //---------------------------------------Carl's Code
   struct proc *t = myproc();
 
-  if (!t->is_thread)
-  {
-    panic("this is not a thread");
-  }
+  if(t == initproc)
+    panic("init exiting");
 
-  struct proc *p = t->parent;
+  // Close all open files.
+  for(int fd = 0; fd < NOFILE; fd++){
+    if(t->ofile[fd]){
+      struct file *f = t->ofile[fd];
+      fileclose(f);
+      t->ofile[fd] = 0;
+    }
+  }
 
   begin_op();
   iput(t->cwd);
   end_op();
   t->cwd = 0;
-  
-  acquire(&t->lock);
+
   acquire(&wait_lock);
-  
-    // Handle thread list updates
-  if (t->last_thread != t) {
-    t->last_thread->next_thread = t->next_thread;
-    t->next_thread->last_thread = t->last_thread;
-  } else {
-        // If this is the only thread, update parent process accordingly
-    acquire(&p->lock);
-    if (p->any_child == t) {
-      p->any_child = (t->next_thread != t) ? t->next_thread : 0;
-    }
-    release(&p->lock);
-  }
 
-  wakeup(p);  // Wake up any thread waiting in thread_join()
+  // Give any children to init.
+  // reparent(t);//shouldn't need to do this but lets see what it changes
 
+  // Parent might be sleeping in wait(). or in our case thread_join
+  wakeup(t->parent);//this will wakeup mainthread
 
-  t->xstate = t->state;
+  // TODO: Modify exit() in kernel/proc.c to terminate all threads when the main process exits.
+
+  acquire(&t->lock);
+
+  // p->xstate = status;//I'm just going to ignore this because we aren't allowing stat struct stuff on our threads
   t->state = ZOMBIE;
 
   release(&wait_lock);
 
-  printf("SYS: Thread %d exited, waiting for sche()\n",t->tid);
-  
+  // Jump into the scheduler, never to return.
   sched();
+  panic("zombie exit");
+  
+  
+  
+  //----------------------------------------------------Yueqiao's Code
+  // struct proc *t = myproc();
 
-  panic("zombie thread exit");
-  return -1;
+  // if (!t->is_thread)
+  // {
+  //   panic("this is not a thread");
+  // }
+
+  // struct proc *p = t->parent;
+
+  // begin_op();
+  // iput(t->cwd);
+  // end_op();
+  // t->cwd = 0;
+  
+  // acquire(&t->lock);
+  // acquire(&wait_lock);
+  
+  //   // Handle thread list updates
+  // if (t->last_thread != t) {
+  //   t->last_thread->next_thread = t->next_thread;
+  //   t->next_thread->last_thread = t->last_thread;
+  // } else {
+  //       // If this is the only thread, update parent process accordingly
+  //   acquire(&p->lock);
+  //   if (p->any_child == t) {
+  //     p->any_child = (t->next_thread != t) ? t->next_thread : 0;
+  //   }
+  //   release(&p->lock);
+  // }
+
+  // wakeup(p);  // Wake up any thread waiting in thread_join()
+
+
+  // t->xstate = t->state;
+  // t->state = ZOMBIE;
+
+  // release(&wait_lock);
+
+  // printf("SYS: Thread %d exited, waiting for sche()\n",t->tid);
+  
+  // sched();
+
+  // panic("zombie thread exit");
+  // return -1;
 }

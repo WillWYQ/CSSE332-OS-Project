@@ -111,13 +111,13 @@ sys_thread_create(void) {
 
 uint64 sys_thread_join(void) {
   uint64 user_tid_addr;
-  int join_tid = 0;
+  // int join_tid = 0;
   // Get the address of the tid argument from user space.
   argaddr(0, &user_tid_addr);
   // Copy the user value into a kernel variable.
-  if(either_copyin(&join_tid, 1, user_tid_addr, sizeof(join_tid)) < 0)
-    return -1;
-  return thread_join(join_tid);
+  // if(either_copyin(&join_tid, 1, user_tid_addr, sizeof(join_tid)) < 0)
+  //   return -1;
+  return thread_join((int*) user_tid_addr);
 }
 
 uint64
