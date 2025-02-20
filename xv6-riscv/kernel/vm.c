@@ -458,7 +458,7 @@ TODO: share stack memory between threads (cur idea is loop and map it into all t
 uint64 uvmthreadstackmap(struct proc * t){
     uint flags = PTE_W | PTE_U;
     
-    uint64 stackVA = PGROUNDUP(t->sz);//does this stop working once one of the stacks disappears?
+    // uint64 stackVA = PGROUNDUP(t->sz);//does this stop working once one of the stacks disappears?
     
     //this should allocate the stack properly unless I need the guard page to be allocated as well but I will just let this be unsafe for right now
     //TODO: need to use a different method because this doesn't work with multiple threads being able to add to the pagetable
@@ -466,11 +466,11 @@ uint64 uvmthreadstackmap(struct proc * t){
     int newsz = uvmalloc(t->pagetable, t->sz, t->sz + PGSIZE, flags);
     if(newsz == 0){
       // Allocation failed.
-      return 0;
+      return -1;
     }
     t->sz = newsz;
     
-    return  stackVA + PGSIZE;//this should return the start of the stack
+    return  newsz;//this should return the start of the stack
 }
 
 //-------------------------------------------Not sure if I will use these yet-------------------
@@ -534,8 +534,10 @@ uvmsharethreadpage(struct proc* sharer_proc, uint64 va)//can replace all args wi
   pagetable_t sharer_table = sharer_proc->pagetable;
   uint64 sz = sharer_proc->sz;
   
-  struct proc * sharee_proc = sharer_proc->next_thread;
+  struct proc * sharee_proc = sharer_proc->parent;
+
   pagetable_t sharee_table;
+  
 
   uint64 pa;
   uint flags;
@@ -547,13 +549,14 @@ uvmsharethreadpage(struct proc* sharer_proc, uint64 va)//can replace all args wi
   pa = PTE2PA(*pte);
   flags = PTE_FLAGS(*pte);
 
-  while(sharee_proc != sharer_proc){
-    sharee_table = sharee_proc->pagetable;
 
-    mappages(sharee_table, va, PGSIZE, pa, flags);
+  while(sharee_proc != sharer_proc){
+    sharee_table = sharee_proc->pagetable;//this line is a problem when I'm in a loop but not when I am out of the loop?
+
+    mappages(sharee_table, PGROUNDDOWN(va), PGSIZE, pa, flags);//this isn't working because I am writing to memory that is not in my address space? (someone elses pagetable)
     sharee_proc->sz = sz;//update size
 
-    sharee_proc = sharee_proc->next_thread;//next in list of threads
+    sharee_proc = sharee_proc->next_thread;//this line is also a problem I am trying to access someone elses proc
   }
   return 0;
 }

@@ -46,8 +46,8 @@ void test_thread_fn3(void *args) {
 void test_thread_fn4(void* args){
     glob_var++;
     printf("global variable: %d\n", glob_var);
-    // thread_exit(0);
-    while(1);//ending in this because I do not properly free shared memory yet
+    thread_exit(0);
+    // while(1);//ending in this because I do not properly free shared memory yet
 }
 
 //test thread function that uses shared memory
@@ -55,16 +55,16 @@ void test_thread_fn5(void* args){
   int some_num = 943875243;
   printf("stack variable: %d at addr: %p\n", some_num, &some_num);
   pointer_to_a_threads_stack = &some_num;
-  // thread_exit(0);
-  while(1);//ending in this because I do not properly free shared memory yet
+  thread_exit(0);
+  // while(1);//ending in this because I do not properly free shared memory yet
 }
 
 //test thread function that uses shared memory
 void test_thread_fn6(void* args){
   sleep(10);//make sure the other thread has time to initialize their variable
   printf("stack variable from other thread: %d at addr: %p\n", *pointer_to_a_threads_stack, pointer_to_a_threads_stack);
-  // thread_exit(0);
-  while(1);//ending in this because I do not properly free shared memory yet
+  thread_exit(0);
+  // while(1);//ending in this because I do not properly free shared memory yet
 }
 
 // Test: create two threads with no arguments.
@@ -87,13 +87,13 @@ void test_threads_with_shared_stacks(void) {
   printf( "Created threads %d\n", tid1);
   int tid2 = thread_create(0, test_thread_fn6);
   printf( "Created threads %d\n", tid2);
-  while(1);//this ending would also cause the frees to happen I think and that might break things
+  // while(1);//this ending would also cause the frees to happen I think and that might break things
   // thread_join(&tid1);
   // thread_join(&tid2);
 }
 
 
-void test_threads_with_args(void){
+void test_threads_with_args(void){//
   //TODO: talk with team about how the final tid arg works
   printf("=== Testing threads with args @ M2 ===\n");
   
@@ -111,7 +111,7 @@ void test_threads_with_args(void){
 
 
 // Test: create two threads with no arguments.
-void test_threads_no_args(void) {
+void test_threads_no_args(void) {//
   printf( "=== Testing threads with no args @ M2 ===\n" );
   // void *stack1 = malloc(PGSIZE);
   // void *stack2 = malloc(PGSIZE);
@@ -161,6 +161,11 @@ int main(int argc, char *argv[]) {
     sleep(30);
     test_threads_with_shared_globals();
     printf( "test_threads_with_shared_globals Test Finished\n");
+    sleep(30);
+    test_thread_no_args_join();
+    sleep(30);
+    test_threads_with_shared_stacks();
+
   } else {
     if (strcmp(argv[1], "noargs") == 0) {
       test_threads_no_args();

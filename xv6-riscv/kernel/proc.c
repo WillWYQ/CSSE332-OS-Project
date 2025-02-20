@@ -743,7 +743,6 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   //this has the kernel create a stack page and add it to the pagetable and updates sz
   uint64 stack_pointer = uvmthreadstackmap(tp);
 
-  // uvmsharethreadpage(tp, stack_pointer); //should be good to just use once list implementation is good
 
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);
@@ -800,6 +799,9 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
     //Adds a new thread to the tail of the list.
     list_add_tail(p->any_child,tp);
   }
+
+  //needs to be after we setup the linked list
+  uvmsharethreadpage(tp, stack_pointer); //should be good to just use once list implementation is good
   release(&p->lock);
 
   tp->state = RUNNABLE;
