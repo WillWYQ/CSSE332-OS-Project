@@ -718,7 +718,23 @@ struct proc* find_parent_thread(struct proc *p){
   return p;
 }
 
-
+/**
+ * Creates a new thread.
+ *
+ * Modified by Yueqiao Wang on Feb 20
+ * Checked by Yueqiao Wang on Feb 20, all functionality passed
+ *
+ * This function allocates a new process structure for a thread and sets up its execution
+ * environment. It shares the parent's user memory pages with the child, creates a new stack,
+ * and initializes the child's trapframe to start execution at the specified routine with the
+ * provided argument. File descriptors and the current working directory are duplicated from the
+ * parent, and the thread is assigned a unique thread ID. The new thread is added to the parent's
+ * thread list and marked as RUNNABLE.
+ *
+ * @param args Pointer to the argument that will be passed to the thread's start routine.
+ * @param start_routine Function pointer to the thread's start routine.
+ * @return The thread ID of the newly created thread on success; otherwise, returns -1.
+ */
 uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
   //want for tid to be unique
@@ -748,7 +764,7 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
     release(&tp->lock);
     return -1;
   }
-  
+
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);
   // Set up new thread start routine and stack.
@@ -892,7 +908,7 @@ uint64 thread_exit(int exit_status) {
 
   if (!t->is_thread)
   {
-    panic("this is not a thread");
+    panic("thread_exit: this is not a thread");
   }
 
   struct proc *p = t->parent;
@@ -922,4 +938,62 @@ uint64 thread_exit(int exit_status) {
 
   panic("zombie thread exit");
   return -1;
+}
+
+/**
+ * Terminates all child/sibiling threads of the calling process.
+ *
+ * Created by Yueqiao Wang on Feb 21
+ * Checked by Yueqiao Wang on Feb 21 08:30, all functionality passed
+ *
+ * If the calling process is a thread, this function obtains its parent process.
+ * It then iterates through all child threads, marking each as a zombie with the
+ * provided exit status. The function safely removes each child from the parent's
+ * thread list using appropriate locking, and wakes up the parent after processing
+ * each child.
+ *
+ * @param exit_status The exit code to set for all child threads.
+ * @return Returns 0 upon successfully terminating all child threads.
+ */
+uint64 thread_all_exit(int exit_status) {
+  struct proc *p = myproc();  // main process (or the thread that is calling thread_all_exit)
+  struct proc *child;
+  if (p->is_thread)
+  {
+    p = p -> parent;
+  }
+
+  // Acquire the wait_lock and the parent's lock so we can safely modify the child list.
+  acquire(&wait_lock);
+  acquire(&p->lock);
+
+  // Loop until there are no more child threads.
+  while(p->any_child != 0) {
+    // Get the first child from the parent's child list.
+    child = p->any_child;
+
+    release(&p->lock);
+
+    // Acquire the child's lock to modify its state.
+    acquire(&child->lock);
+    
+    // Remove the child from the parent's thread list.
+    list_del(child);
+
+    // Mark the child as a zombie and set its exit status.
+    child->xstate = exit_status;
+    child->state = ZOMBIE;
+
+    release(&child->lock);
+
+    wakeup(p);
+
+    acquire(&p->lock);
+    
+  }
+  
+  release(&p->lock);
+  release(&wait_lock);
+
+  return 0;
 }

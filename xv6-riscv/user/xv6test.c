@@ -49,6 +49,21 @@ void test_thread_fn4(void* args){
     // while(1);//ending in this because I do not properly free shared memory yet
 }
 
+// Test thread function: Infinite loop (child threads that run indefinitely).
+void test_infinite_loop(void *args) {
+  while(1) {
+    // Sleep to avoid busy-waiting.
+    sleep(10);
+  }
+  // This should never be reached.
+  thread_exit(0);
+}
+
+// Test thread function exited by child
+void test_child_exit_all() {
+  thread_all_exit(2);
+}
+
 // Test thread function: writer thread that stores a pointer to its local variable.
 void test_thread_stack_share_writer(void *args) {
   int local_val = 12345;  // Local (stack) variable.
@@ -96,6 +111,56 @@ void test_threads_shared_stack_vars(void) {
   thread_join(&tid_writer);
   thread_join(&tid_reader);
   printf("=== Shared stack variable test completed ===\n");
+}
+
+// Test: Forcibly exit all child threads using thread_all_exit in main
+void test_thread_all_exit_by_child(void) {
+  printf("=== Testing thread_all_exit: Forcibly exiting all child threads by a Child ===\n");
+
+  // Create a few threads that run an infinite loop.
+  int tid1 = thread_create(0, test_infinite_loop);
+  int tid2 = thread_create(0, test_infinite_loop);
+  int tid3 = thread_create(0, test_infinite_loop);
+  printf("Created threads %d, %d, %d\n", tid1, tid2, tid3);
+
+  // Allow the threads to run for a while.
+  sleep(10);
+
+  // Call thread_all_exit from the main (or parent) process to terminate all child threads.
+  printf("Calling thread_all_exit() from a child process.\n");
+  test_child_exit_all();
+
+  // Join each thread to ensure they have terminated.
+  thread_join(&tid1);
+  thread_join(&tid2);
+  thread_join(&tid3);
+  
+  printf("All child threads terminated by thread_all_exit().\n");
+}
+
+// Test: Forcibly exit all child threads using thread_all_exit in main
+void test_thread_all_exit_by_main(void) {
+  printf("=== Testing thread_all_exit: Forcibly exiting all child threads by Main ===\n");
+
+  // Create a few threads that run an infinite loop.
+  int tid1 = thread_create(0, test_infinite_loop);
+  int tid2 = thread_create(0, test_infinite_loop);
+  int tid3 = thread_create(0, test_infinite_loop);
+  printf("Created threads %d, %d, %d\n", tid1, tid2, tid3);
+
+  // Allow the threads to run for a while.
+  sleep(10);
+
+  // Call thread_all_exit from the main (or parent) process to terminate all child threads.
+  printf("Calling thread_all_exit() from the main process.\n");
+  thread_all_exit(1);
+
+  // Join each thread to ensure they have terminated.
+  thread_join(&tid1);
+  thread_join(&tid2);
+  thread_join(&tid3);
+  
+  printf("All child threads terminated by thread_all_exit().\n");
 }
 
 
@@ -181,6 +246,10 @@ int main(int argc, char *argv[]) {
       test_threads_with_shared_globals();
     } else if(strcmp(argv[1], "jointest") == 0){
       test_thread_no_args_join();
+    } else if(strcmp(argv[1], "mainexitall") == 0){
+      test_thread_all_exit_by_main();
+    } else if(strcmp(argv[1], "childexitall") == 0){
+      test_thread_all_exit_by_child();
     } else if(strcmp(argv[1], "withstacks") == 0){
       test_threads_shared_stack_vars();
     } else {

@@ -126,3 +126,10 @@ sys_thread_exit(void) {
     return thread_exit(exit_status);
 }
 
+uint64
+sys_thread_all_exit(void) {
+    int exit_status;
+    argint(0, &exit_status);
+    return thread_all_exit(exit_status);
+}
+

@@ -101,13 +101,15 @@ void list_del(struct proc *entry)
     }
     release(&p->lock);
   } else {
+    // Save the next pointer before __list_del resets it.
+    struct proc *next = entry->next_thread;
     // Remove the entry from the circular list.
     __list_del(entry->last_thread, entry, entry->next_thread);
-
+    
     acquire(&p->lock);
     if (p->any_child == entry) {
-      // Update parent's pointer to the next thread.
-      p->any_child = entry->next_thread;
+      // Update parent's pointer to the saved next thread.
+      p->any_child = next;
     }
     release(&p->lock);
   }

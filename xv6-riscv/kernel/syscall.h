@@ -26,3 +26,4 @@
 #define SYS_thread_create 23
 #define SYS_thread_join 24
 #define SYS_thread_exit 25
+#define SYS_thread_all_exit 26
