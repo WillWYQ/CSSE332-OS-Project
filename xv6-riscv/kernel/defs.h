@@ -110,7 +110,7 @@ void            procdump(void);
 uint64          spoon(void*);
 uint64          thread_create(void *args, void (*start_routine)(void*));
 uint64          thread_join(int *join_tid);
-uint64          thread_exit(int *tid);
+uint64          thread_exit(int exit_status);
 
 
 // swtch.S

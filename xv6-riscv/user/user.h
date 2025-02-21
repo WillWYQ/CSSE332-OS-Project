@@ -44,5 +44,5 @@ void *memcpy(void *, const void *, uint);
 int spoon(void*);
 int thread_create(void *args, void (*start_routine)(void*));
 int thread_join(int *tid);
-void thread_exit(int *tid);
+void thread_exit(int exit_status);
 

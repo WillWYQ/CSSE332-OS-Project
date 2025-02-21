@@ -72,7 +72,6 @@ uint64
 sys_kill(void)
 {
   int pid;
-
   argint(0, &pid);
   return kill(pid);
 }
@@ -122,9 +121,8 @@ uint64 sys_thread_join(void) {
 
 uint64
 sys_thread_exit(void) {
-    uint64 tid;
-    argaddr(0, &tid);
-    
-    return thread_exit((int*)tid);
+    int exit_status;
+    argint(0, &exit_status);
+    return thread_exit(exit_status);
 }
 

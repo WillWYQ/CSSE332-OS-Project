@@ -742,21 +742,21 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
   //this has the kernel create a stack page and add it to the pagetable and updates sz
   uint64 stack_pointer = uvmthreadstackmap(tp);
-
-
+  if(stack_pointer == 0){
+  // Cleanup before returning error.
+    freeproc(tp);
+    release(&tp->lock);
+    return -1;
+  }
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);
-
-  // Cause fork to return 0 in the child.
-  // printf("original epc: %p\n",(int*) tp->trapframe->epc);
+  // Set up new thread start routine and stack.
   tp->trapframe->epc = (uint64) start_routine;//thread_fn;
   tp->trapframe->sp = (uint64) stack_pointer;
-  tp->trapframe->a0 = (uint64) args;//if the code I enter into isn't expecting a return value it won't use this as a return value it will use it as the normal arg register
-  // printf("original ra: %p\n",(int*) tp->trapframe->ra);
-  // tp->trapframe->a1 = (uint64) start_routine;
-  // tp->trapframe->a2 = (uint64) tid;
+  tp->trapframe->a0 = (uint64) args;
+  //if the code I enter into isn't expecting a return value it won't use this as a return value it will use it as the normal arg register
 
-  // increment reference counts on open file descriptors.
+  // Duplicate parent's file descriptors.
   for(i = 0; i < NOFILE; i++){
     if(p->ofile[i])
       tp->ofile[i] = filedup(p->ofile[i]);
@@ -765,21 +765,14 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
   safestrcpy(tp->name, p->name, sizeof(p->name));
 
+  // Set thread/process IDs.
   tpid = tp->pid;
   tp->tid = tp->pid;
 
-  //TODO: make sure the parent is the real main thread, not the one who created it
-  //if the thing that created me has isthread then I want it's parent 
-  //because if isthread is true then that means its not the main thread
-  //because it has a main thread above it
-  
-  //Now this should make sure that the new child will not 
-  //be the parent but the actual parent that gave birth to
-  //the child will be the main thread
+  // Ensure the new thread's parent is the real main thread.
   tp->parent = find_parent_thread(p);
 
   //This should be fine but need to figure out why is this not working
-  //
   //Sets the isthread flag
   tp->is_thread = 1;
 
@@ -788,20 +781,11 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   if(p->any_child == 0){
     // No child exists yet.
     p->any_child = tp;
-    // tp->next_thread = tp; // Circular list: next points to self.
-    // tp->last_thread = tp; // Circular list: last points to self.
-    
-    //this initializes the new thread's list
-    init_list(tp);
+    init_list(tp); // Initializes the thread's own circular list.
   } else {
-    // // Parent already has at least one child.
-    // // p->any_child points to the first child.
-    //Adds a new thread to the tail of the list.
-    list_add_tail(p->any_child,tp);
+    // Add the new thread to the tail of the parent's thread list.
+    list_add_tail(p->any_child, tp);
   }
-
-  //needs to be after we setup the linked list
-  //uvmsharethreadpage(tp, stack_pointer); //should be good to just use once list implementation is good
   release(&p->lock);
 
   tp->state = RUNNABLE;
@@ -812,64 +796,90 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
 }
 
+/**
+ * Waits for a child thread to exit.
+ *
+ * If the provided join_tid pointer is null, the function waits for any child thread
+ * to exit. Otherwise, it reads the specific thread ID from user space and waits for
+ * that particular thread to exit.
+ *
+ * Modified by Yueqiao Wang on Feb 20  
+ * Checked by Yueqiao Wang on Feb 20 22:18, all functionality passed
+ *
+ * @param join_tid Pointer to the thread ID to wait for. If null, waits for any child thread.
+ * @return The thread ID of the joined (exited) child thread if successful; otherwise, returns -1 on error or if no child exists.
+ */
 uint64 thread_join(int * join_tid) {  
-// if tid is null, wait for any one, if not, wait for that one
-
-  struct proc *ct;//child thread
-  int pid, havechild;//shouldn't need to worry about have kids bc threads shouldn't have kids
-  struct proc *mt = myproc();//main thread
-  int tid;// I need this for a thing to copy into
+  struct proc *ct;            // Iterator for child threads
+  int ret_tid = -1;           // Return value: the thread ID of the joined thread
+  int havechild;              // Flag to indicate if any child exists
+  struct proc *mt = myproc(); // Main thread (parent)
+  int tid = 0;                // Thread ID to look for
 
   //all page tables should be equivalent and the join tid should either be in globals or the main threads stack so this should work
-  copyin(mt->pagetable, (char*) &tid, (uint64) join_tid, (uint64) sizeof(int));//get tid to match from user space
+  //get tid to match from user space
+  if(join_tid != 0){
+    if(copyin(mt->pagetable, (char*)&tid, (uint64)join_tid, sizeof(int)) < 0){
+      return -1;  // error: invalid pointer from user space'
+    }
+  }
 
-  printf("thread join called with %d as tid inside function\n", tid);
-
+  printf("SYS_Proc: thread join called with %d as tid inside function\n", tid);
   acquire(&wait_lock);
 
   for(;;){
     // Scan through table looking for exited children.
-    printf("thread join of mainthread: %d is checking for if child with tid:%d exited (inloop)\n", mt->pid, tid);
+    printf("SYS_Proc: thread join of mainthread: %d is checking for if child with tid:%d exited (inloop)\n", mt->pid, tid);
     havechild = 0;
 
+    // Scan through the process table for child threads.
     for(ct = proc; ct < &proc[NPROC]; ct++){
-      if(ct->parent == mt){
+      if(ct->parent == mt && ct->is_thread) {
         havechild = 1;
-      }
-
-      if((!tid || tid == 0 || ct->tid == tid) && ct->parent == mt && ct->is_thread) {//this if statement can probably be replaced wit  == ct->pid(itstid)//used to be ct->parent == mt
-        // make sure the child isn't still in exit() or swtch().
-        acquire(&ct->lock);
-
-        if(ct->state == ZOMBIE){
-          // Found one.
-          pid = ct->pid;
+        if(tid == 0 || ct->tid == tid) {  // Either join any thread or a specific one
+          acquire(&ct->lock);
+          if(ct->state == ZOMBIE) {
+            // Found an exited thread: record its thread id.
+            ret_tid = ct->tid;
+            release(&ct->lock);
+            release(&wait_lock);
+            printf("SYS_Proc: reaches end of successful thread_join with %d as the tid\n", ret_tid);
+            return ret_tid;
+          }
           release(&ct->lock);
-          release(&wait_lock);
-          printf("reaches end of successful thread_join with %d as the tid\n", pid);
-          return pid;
         }
-        release(&ct->lock);
       }
     }
 
-    // No point waiting if we don't have any children.
+    // No children exist, or the parent is killed.
     if(!havechild || killed(mt)){
       release(&wait_lock);
       return -1;
     }
 
-    // Wait for a child to exit.
-    sleep(mt, &wait_lock);  //DOC: wait-sleep
+    // Wait for a child thread to exit.
+    sleep(mt, &wait_lock);  // Wait-sleep releases wait_lock while sleeping and reacquires it before returning.
   }
+  
   return 0;
 }
 
-// TODO are we have thread id or just kill the current runing thread
-// implemented by Yueqiao Wang on Feb 9 
-uint64 thread_exit(int *tid) {
-
-  //----------------------------------------------------Yueqiao's Code
+/**
+ * Terminates the calling thread.
+ *
+ * Modified by Yueqiao Wang on Feb 20
+ * Checked by Yueqiao Wang on Feb 20 22:06, all functionality passed
+ *
+ * This function performs cleanup for a thread, including releasing its current
+ * working directory, removing it from the scheduler's list, and setting its state
+ * to ZOMBIE with the provided exit status. It wakes up the parent process and then
+ * switches context via sched() (which should never return). If the calling process is
+ * not a thread, a panic is triggered.
+ *
+ * @param exit_status The exit code to be recorded for the thread.
+ * @return This function does not return normally as it performs a context switch.
+ */
+uint64 thread_exit(int exit_status) {
   struct proc *t = myproc();
 
   if (!t->is_thread)
@@ -884,48 +894,24 @@ uint64 thread_exit(int *tid) {
   end_op();
   t->cwd = 0;
   
+
   acquire(&t->lock);
   acquire(&wait_lock);
-  
-  //this should handle the function to handle the removal of threads
-  //while also updating the next and last thread pointers
+
   list_del(t);
 
-  //   // Handle thread list updates
-  // if (t->last_thread != t) {
-  //   t->last_thread->next_thread = t->next_thread;
-  //   t->next_thread->last_thread = t->last_thread;
-  //   //see if I am just updating the list by adding a
-  //   //tail to this but not completely sure
-  // } else {
-  //       // If this is the only thread, update parent process accordingly
-  //   acquire(&p->lock);
-  //   if (p->any_child == t) {
-  //     p->any_child = (t->next_thread != t) ? t->next_thread : 0;
-  //   }
-  //   release(&p->lock);
-  // }
-    // Handle thread list updates
-  if (t->next_thread == t) {
-      // If this is the only thread, update parent process accordingly
-      acquire(&p->lock);
-      if (p->any_child == t) {
-        p->any_child = 0;
-      }
-      release(&p->lock);
-  }
+  wakeup(p); 
 
-  wakeup(p);  // Wake up any thread waiting in thread_join()
-
-
-  t->xstate = t->state;
+  // Set the exit status and mark the thread as a zombie.
+  t->xstate = exit_status;
   t->state = ZOMBIE;
 
   release(&wait_lock);
+  // Note: t->lock is intentionally held for the context switch.
 
-  printf("SYS: Thread %d exited, waiting for sche()\n",t->tid);
+  printf("SYS_Proc: Thread %d exited with status %d, waiting for sche()\n", t->tid, t->xstate);
   
-  sched();
+  sched(); // Context switch: this call should never return
 
   panic("zombie thread exit");
   return -1;
