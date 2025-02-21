@@ -160,7 +160,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   for(;;){
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
-  
+    
     increfcount(pa);
     // if(*pte & PTE_V)
     //   panic("mappages: remap");
@@ -338,7 +338,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   }
   return 0;
 
- err:
+  err:
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
 }
@@ -449,73 +449,62 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-/*
-kalloc a page for our stack
-map that page into the proc's page table
-needs to return a va pointer to the top of the stack
-TODO: share stack memory between threads (cur idea is loop and map it into all the connected procs pagetables)
-*/
+
 uint64 uvmthreadstackmap(struct proc * t){
-    uint flags = PTE_W | PTE_U;
-    
-    // uint64 stackVA = PGROUNDUP(t->sz);//does this stop working once one of the stacks disappears?
-    
-    //this should allocate the stack properly unless I need the guard page to be allocated as well but I will just let this be unsafe for right now
-    //TODO: need to use a different method because this doesn't work with multiple threads being able to add to the pagetable
-    //or I could leave it as a memeory leaker because I don't have a free list for virtual addresses and especially not of virtual addresses in chunks the size of a page
-    int newsz = uvmalloc(t->pagetable, t->sz, t->sz + PGSIZE, flags);
-    if(newsz == 0){
+  uint flags = PTE_W | PTE_U;
+  
+  int newsz = uvmalloc(t->pagetable, t->sz, t->sz + PGSIZE, flags);
+  if(newsz == 0){
       // Allocation failed.
-      return -1;
-    }
-    t->sz = newsz;
-    
-    return  newsz;//this should return the start of the stack
-}
-
-//-------------------------------------------Not sure if I will use these yet-------------------
-/*
-copied uvmcopy
-basically just remap all the pages of one page table to another
-*/
-int uvmshareallthreadpages(pagetable_t old, pagetable_t new, uint64 sz){
-  pte_t *pte;
-  uint64 pa, i; 
-  uint flags;
-
-  for(i = 0; i < sz; i += PGSIZE){
-    if((pte = walk(old, i, 0)) == 0)
-      panic("uvmshareallthreadpages: pte should exist");
-    if((*pte & PTE_V) == 0)
-      panic("uvmshareallthreadpages: page not present");
-    pa = PTE2PA(*pte);
-    flags = PTE_FLAGS(*pte);
-
-    if(mappages(new, i, PGSIZE, pa, flags) != 0){
-      goto err;
-    }
+    return -1;
   }
-  return 0;
+  t->sz = newsz;
+  
+    return  newsz;//this should return the start of the stack
+  }
 
- err:
-  uvmunmap(new, 0, i / PGSIZE, 1);
-  return -1;
-}
+  int uvmshareallthreadpages(pagetable_t old, pagetable_t new, uint64 sz){
+    pte_t *pte;
+    uint64 pa, i; 
+    uint flags;
+
+    for(i = 0; i < sz; i += PGSIZE){
+
+      if((pte = walk(old, i, 0)) == 0)
+        panic("uvmshareallthreadpages: pte should exist");
+
+      if((*pte & PTE_V) == 0)
+        panic("uvmshareallthreadpages: page not present");
+
+      pa = PTE2PA(*pte);
+
+      flags = PTE_FLAGS(*pte);
+
+      if(mappages(new, i, PGSIZE, pa, flags) != 0){
+        goto err;
+      }
+    }
+    return 0;
+
+    err:
+    uvmunmap(new, 0, i / PGSIZE, 0);
+    return -1;
+  }
 
 /*
 similar to share thread page but it calls uvmunmap with do_free = 1
 the va should be sp rounded down so I know I am unmapping the stack
 I think this works as well but can't test it until we have the list implementation
 */
-int uvmunsharethreadpage(struct proc* sharer_proc, uint64 va){
+  int uvmunsharethreadpage(struct proc* sharer_proc, uint64 va){
   // pagetable_t sharer_table = sharer_proc->pagetable;
-  uint64 sz = sharer_proc->sz;
-  
-  struct proc* sharee_proc = sharer_proc->next_thread;
-  pagetable_t sharee_table;
+    uint64 sz = sharer_proc->sz;
+    
+    struct proc* sharee_proc = sharer_proc->next_thread;
+    pagetable_t sharee_table;
 
-  while(sharee_proc != sharer_proc){
-    sharee_table = sharee_proc->pagetable;
+    while(sharee_proc != sharer_proc){
+      sharee_table = sharee_proc->pagetable;
 
     uvmunmap(sharee_table, PGROUNDDOWN(va), 1, 1);//table to unmap from, virtual addr, numpages, do_free
     sharee_proc->sz = sz;//update size
@@ -525,19 +514,11 @@ int uvmunsharethreadpage(struct proc* sharer_proc, uint64 va){
   return 0;
 }
 
-/*
-I think this works but I can't test it until we have the list implementation
-*/
 int
-uvmsharethreadpage(struct proc* sharer_proc, uint64 va)//can replace all args with proc struct as long as I set these variables
+uvmsharethreadpage(struct proc* sharer_proc, uint64 va)
 {
   pagetable_t sharer_table = sharer_proc->pagetable;
   uint64 sz = sharer_proc->sz;
-  
-  struct proc * sharee_proc = sharer_proc->parent;
-  pagetable_t sharee_table;
-  
-
   uint64 pa;
   uint flags;
   pte_t *pte;
@@ -548,18 +529,23 @@ uvmsharethreadpage(struct proc* sharer_proc, uint64 va)//can replace all args wi
   pa = PTE2PA(*pte);
   flags = PTE_FLAGS(*pte);
 
-  //share with main thread
-  mappages(sharer_proc->parent->pagetable, PGROUNDDOWN(va), PGSIZE, pa, flags);//this isn't working because I am writing to memory that is not in my address space? (someone elses pagetable)
-  sharer_proc->parent->sz = sz;//update size
+  // Assume the parent's pointer points to the head of a circular list
+  struct proc *t = sharer_proc->parent->any_child;
+  struct proc *head = t;  // Save the head to know when we've completed a cycle
 
-  //share with siblings
-  while(sharee_proc != sharer_proc){
-    sharee_table = sharee_proc->pagetable;//this line is a problem when I'm in a loop but not when I am out of the loop?
+  if(mappages(sharer_proc->parent->pagetable, PGROUNDDOWN(va), PGSIZE, pa, flags) != 0)
+    return -1;
+  sharer_proc->parent->sz = sz;
 
-    mappages(sharee_table, PGROUNDDOWN(va), PGSIZE, pa, flags);//this isn't working because I am writing to memory that is not in my address space? (someone elses pagetable)
-    sharee_proc->sz = sz;//update size
+  do {
+    // Skip mapping for the sharer process itself if it already has the mapping.
+    if(t != sharer_proc) {
+      if(mappages(t->pagetable, PGROUNDDOWN(va), PGSIZE, pa, flags) != 0)
+        return -1;  // Consider cleaning up previously mapped pages in a full implementation
+      t->sz = sz; // update size for each thread
+    }
+    t = t->next_thread;
+  } while(t != head);
 
-    sharee_proc = sharee_proc->next_thread;//this line is also a problem I am trying to access someone elses proc
-  }
   return 0;
 }

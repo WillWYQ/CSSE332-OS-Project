@@ -742,12 +742,13 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
 
   //this has the kernel create a stack page and add it to the pagetable and updates sz
   uint64 stack_pointer = uvmthreadstackmap(tp);
-  if(stack_pointer == 0){
+  if(stack_pointer == (uint64)-1){
   // Cleanup before returning error.
     freeproc(tp);
     release(&tp->lock);
     return -1;
   }
+  
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);
   // Set up new thread start routine and stack.
@@ -787,6 +788,13 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
     list_add_tail(p->any_child, tp);
   }
   release(&p->lock);
+
+  // if(uvmsharethreadpage(tp, PGROUNDDOWN(stack_pointer)) < 0){
+  //   // Cleanup before returning error.
+  //   freeproc(tp);
+  //   release(&tp->lock);
+  //   return -1;
+  // }
 
   tp->state = RUNNABLE;
   
@@ -893,7 +901,6 @@ uint64 thread_exit(int exit_status) {
   iput(t->cwd);
   end_op();
   t->cwd = 0;
-  
 
   acquire(&t->lock);
   acquire(&wait_lock);
