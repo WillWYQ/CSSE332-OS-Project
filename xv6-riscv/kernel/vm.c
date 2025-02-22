@@ -160,10 +160,9 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   for(;;){
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
-    
     increfcount(pa);
-    // if(*pte & PTE_V)
-    //   panic("mappages: remap");
+    if(*pte & PTE_V)
+      panic("mappages: remap");
     *pte = PA2PTE(pa) | perm | PTE_V;
     if(a == last)
       break;
@@ -451,8 +450,8 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 
 uint64 uvmthreadstackmap(struct proc * t){
-  uint flags = PTE_W | PTE_U;
-  
+  uint flags = PTE_W | PTE_U | PTE_V;
+  // uint64 oldsz = t->sz;
   int newsz = uvmalloc(t->pagetable, t->sz, t->sz + PGSIZE, flags);
   if(newsz == 0){
       // Allocation failed.
@@ -460,92 +459,149 @@ uint64 uvmthreadstackmap(struct proc * t){
   }
   t->sz = newsz;
   
-    return  newsz;//this should return the start of the stack
-  }
+  return newsz;//this should return the start of the stack
+}
 
-  int uvmshareallthreadpages(pagetable_t old, pagetable_t new, uint64 sz){
-    pte_t *pte;
-    uint64 pa, i; 
-    uint flags;
 
-    for(i = 0; i < sz; i += PGSIZE){
+int uvmshareallthreadpages(pagetable_t old, pagetable_t new, uint64 sz){
+  pte_t *pte;
+  uint64 pa, i; 
+  uint flags;
 
-      if((pte = walk(old, i, 0)) == 0)
-        panic("uvmshareallthreadpages: pte should exist");
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walk(old, i, 0)) == 0)
+      panic("uvmshareallthreadpages: pte should exist");
 
-      if((*pte & PTE_V) == 0)
-        panic("uvmshareallthreadpages: page not present");
+    if((*pte & PTE_V) == 0)
+      panic("uvmshareallthreadpages: page not present");
 
-      pa = PTE2PA(*pte);
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
 
-      flags = PTE_FLAGS(*pte);
-
-      if(mappages(new, i, PGSIZE, pa, flags) != 0){
-        goto err;
-      }
+    if(mappages(new, i, PGSIZE, pa, flags) != 0){
+      uvmunmap(new, 0, i / PGSIZE, 0);
+      return -1;
     }
-    return 0;
-
-    err:
-    uvmunmap(new, 0, i / PGSIZE, 0);
-    return -1;
-  }
-
-/*
-similar to share thread page but it calls uvmunmap with do_free = 1
-the va should be sp rounded down so I know I am unmapping the stack
-I think this works as well but can't test it until we have the list implementation
-*/
-  int uvmunsharethreadpage(struct proc* sharer_proc, uint64 va){
-  // pagetable_t sharer_table = sharer_proc->pagetable;
-    uint64 sz = sharer_proc->sz;
-    
-    struct proc* sharee_proc = sharer_proc->next_thread;
-    pagetable_t sharee_table;
-
-    while(sharee_proc != sharer_proc){
-      sharee_table = sharee_proc->pagetable;
-
-    uvmunmap(sharee_table, PGROUNDDOWN(va), 1, 1);//table to unmap from, virtual addr, numpages, do_free
-    sharee_proc->sz = sz;//update size
-
-    sharee_proc = sharee_proc->next_thread;//next in list of threads
   }
   return 0;
 }
 
 int
-uvmsharethreadpage(struct proc* sharer_proc, uint64 va)
+uvmsharethreadpage(struct proc *sharer_proc, uint64 va)
 {
   pagetable_t sharer_table = sharer_proc->pagetable;
-  uint64 sz = sharer_proc->sz;
-  uint64 pa;
-  uint flags;
-  pte_t *pte;
+  uint64 va_round = PGROUNDDOWN(va - PGSIZE);
 
-  if((pte = walk(sharer_table, PGROUNDDOWN(va), 0)) == 0)
+  // Fetch the PTE in the sharer process's pagetable.
+  pte_t *pte = walk(sharer_table, va_round, 0);
+  if(pte == 0){
+    printf("uvmsharethreadpage: no PTE at va %p\n", va_round);
     return -1;
-
-  pa = PTE2PA(*pte);
-  flags = PTE_FLAGS(*pte);
-
-  // Assume the parent's pointer points to the head of a circular list
-  struct proc *t = sharer_proc->parent->any_child;
-  struct proc *head = t;  // Save the head to know when we've completed a cycle
-
-  if(mappages(sharer_proc->parent->pagetable, PGROUNDDOWN(va), PGSIZE, pa, flags) != 0)
+  }
+  if((*pte & PTE_V) == 0){
+    printf("uvmsharethreadpage: page not present at va %p\n", va_round);
     return -1;
-  sharer_proc->parent->sz = sz;
+  }
 
-  do {
-    // Skip mapping for the sharer process itself if it already has the mapping.
-    if(t != sharer_proc) {
-      if(mappages(t->pagetable, PGROUNDDOWN(va), PGSIZE, pa, flags) != 0)
-        return -1;  // Consider cleaning up previously mapped pages in a full implementation
-      t->sz = sz; // update size for each thread
+  // Extract the physical address and flags to share.
+  uint64 pa    = PTE2PA(*pte);
+  uint64 flags = PTE_FLAGS(*pte);
+
+  // Get the parent (the "owner" or main process).
+  struct proc *parent = sharer_proc->parent;
+  if(parent == 0){
+    printf("uvmsharethreadpage: sharer_proc has no parent\n");
+    return -1;
+  }
+
+  // Remap parent
+  // Only unmap if the parent already had this page mapped (or partly mapped).
+  pte_t *pte_parent = walk(parent->pagetable, va_round, 0);
+  if(pte_parent && (*pte_parent & PTE_V)){
+    uvmunmap(parent->pagetable, va_round, 1, 0);
+  }
+
+  // Now map it to the same physical page.
+  if(mappages(parent->pagetable, va_round, PGSIZE, pa, flags) != 0){
+    printf("uvmsharethreadpage: error remapping in parent's page table\n");
+    return -1;
+  }
+
+  //Remap sibling's page table
+  struct proc *start_sib = parent->any_child;
+  if(start_sib != 0) {
+    struct proc *sibling = start_sib;
+    do {
+      if(sibling != sharer_proc) {
+        // Unmap if the sibling already has it mapped:
+        pte_t *pte_sib = walk(sibling->pagetable, va_round, 0);
+        if(pte_sib && (*pte_sib & PTE_V)){
+          uvmunmap(sibling->pagetable, va_round, 1, 0);
+        }
+
+        if(mappages(sibling->pagetable, va_round, PGSIZE, pa, flags) != 0){
+          printf("uvmsharethreadpage: error remapping sibling\n");
+          return -1;
+        }
+      }
+      sibling = sibling->next_thread;
+    } while(sibling != start_sib);
+  }
+
+  return 0;
+}
+
+int
+uvmreclaimthreadpages(struct proc *sharer_proc, uint64 va, int do_free)
+{
+  pagetable_t sharer_table = sharer_proc->pagetable;
+  uint64 va_round = PGROUNDDOWN(va);
+
+  // Fetch the PTE in the sharer process's pagetable.
+  pte_t *pte = walk(sharer_table, va_round, 0);
+  if(pte == 0){
+    printf("uvmreclaimthreadpages: no PTE at va %p\n", va_round);
+    return -1;
+  }
+  if((*pte & PTE_V) == 0){
+    printf("uvmreclaimthreadpages: page not present at va %p\n", va_round);
+    return -1;
+  }
+
+
+  // Get the parent (the "owner" or main process).
+  struct proc *parent = sharer_proc->parent;
+  if(parent == 0){
+    printf("uvmreclaimthreadpages: sharer_proc has no parent\n");
+    return -1;
+  }
+
+  // Only unmap if the parent already had this page mapped (or partly mapped).
+  pte_t *pte_parent = walk(parent->pagetable, va_round, 0);
+  if (pte_parent && (*pte_parent & PTE_V)) {
+    uint flags = PTE_FLAGS(*pte_parent);
+    if(flags & (PTE_R|PTE_W|PTE_X)) {
+      uvmunmap(parent->pagetable, va_round, 1, 0);
+    } else {
     }
-    t = t->next_thread;
-  } while(t != head);
+  }
+
+
+  //Remap sibling's page table
+  struct proc *start_sib = parent->any_child;
+  if(start_sib != 0) {
+    struct proc *sibling = start_sib;
+    do {
+      if(sibling != sharer_proc) {
+        // Unmap if the sibling already has it mapped
+        pte_t *pte_sib = walk(sibling->pagetable, va_round, 0);
+        if(pte_sib && (*pte_sib & PTE_V)){
+          uvmunmap(sibling->pagetable, va_round, 1, 0);
+        }
+      }
+      sibling = sibling->next_thread;
+    } while(sibling != start_sib);
+  }
 
   return 0;
 }

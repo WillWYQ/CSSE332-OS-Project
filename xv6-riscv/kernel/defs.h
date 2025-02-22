@@ -180,11 +180,12 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
-//added by Carl
+//added by Carl & Yueqiao
+// Modified by Yueqiao
 uint64    uvmthreadstackmap(struct proc * p);
 int uvmshareallthreadpages(pagetable_t old, pagetable_t new, uint64 sz);
 int uvmsharethreadpage(struct proc* sharer_proc, uint64 va);
-int uvmunsharethreadpage(struct proc* sharer_proc, uint64 va);
+int uvmreclaimthreadpages(struct proc *exiting_thread, uint64 va, int do_free);
 
 // plic.c
 void            plicinit(void);

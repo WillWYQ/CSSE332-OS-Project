@@ -698,14 +698,6 @@ spoon(void *arg)
   return -1;
 }
 
-
-// void *thread_fn(void* args, void (*start_routine)(void*), int *tid){
-//   start_routine(args);
-//   thread_exit(tid);
-//   return 0;//doesn't matter bc thread_exit theoretically kills this process
-// }
-
-
 //I decided to make a helper function to set the parent right so that 
 //when a thead is created the parent is set correctly
 
@@ -736,11 +728,8 @@ struct proc* find_parent_thread(struct proc *p){
  * @return The thread ID of the newly created thread on success; otherwise, returns -1.
  */
 uint64 thread_create(void *args, void (*start_routine)(void*)) {
-
-  //want for tid to be unique
   int i, tpid;
-  //thread_process
-  struct proc *tp;
+  struct proc *tp; //thread_process
   struct proc *p = myproc();
 
   // Allocate process.
@@ -748,8 +737,12 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
     return -1;
   }
 
+  // Ensure the new thread's parent is the real main thread.
+  p = find_parent_thread(p);
+
   // map user memory from "parent" to child.
-  if(uvmshareallthreadpages(p->pagetable, tp->pagetable, p->sz) < 0){//used to be uvmcopy
+  if(uvmshareallthreadpages(p->pagetable, tp->pagetable, p->sz) < 0){
+    printf("SYS: Error uvmshareallthreadpages\n");
     freeproc(tp);
     release(&tp->lock);
     return -1;
@@ -760,10 +753,13 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   uint64 stack_pointer = uvmthreadstackmap(tp);
   if(stack_pointer == (uint64)-1){
   // Cleanup before returning error.
+    printf("SYS: Error uvmthreadstackmap\n");
     freeproc(tp);
     release(&tp->lock);
     return -1;
   }
+
+
 
   // copy saved user registers.
   *(tp->trapframe) = *(p->trapframe);
@@ -785,9 +781,8 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   // Set thread/process IDs.
   tpid = tp->pid;
   tp->tid = tp->pid;
-
-  // Ensure the new thread's parent is the real main thread.
-  tp->parent = find_parent_thread(p);
+  
+  tp->parent = p;
 
   //This should be fine but need to figure out why is this not working
   //Sets the isthread flag
@@ -805,19 +800,20 @@ uint64 thread_create(void *args, void (*start_routine)(void*)) {
   }
   release(&p->lock);
 
-  // if(uvmsharethreadpage(tp, PGROUNDDOWN(stack_pointer)) < 0){
-  //   // Cleanup before returning error.
-  //   freeproc(tp);
-  //   release(&tp->lock);
-  //   return -1;
-  // }
-
   tp->state = RUNNABLE;
+
+    // Remap the newly allocated stack into the shared address space.
+  // This propagates the mapping to parent's and sibling threads' page tables.
+  if(uvmsharethreadpage(tp, stack_pointer) < 0){
+    // printf("SYS: Error uvmsharethreadpage\n");
+    freeproc(tp);
+    release(&tp->lock);
+    return -1;
+  }
   
   release(&tp->lock);//once tp releases its lock as runnable it is free to runs
 
   return tpid;
-
 }
 
 /**
@@ -848,12 +844,12 @@ uint64 thread_join(int * join_tid) {
     }
   }
 
-  printf("SYS_Proc: thread join called with %d as tid inside function\n", tid);
+  // printf("SYS_Proc: thread join called with %d as tid inside function\n", tid);
   acquire(&wait_lock);
 
   for(;;){
     // Scan through table looking for exited children.
-    printf("SYS_Proc: thread join of mainthread: %d is checking for if child with tid:%d exited (inloop)\n", mt->pid, tid);
+    // printf("SYS_Proc: thread join of mainthread: %d is checking for if child with tid:%d exited (inloop)\n", mt->pid, tid);
     havechild = 0;
 
     // Scan through the process table for child threads.
@@ -865,9 +861,11 @@ uint64 thread_join(int * join_tid) {
           if(ct->state == ZOMBIE) {
             // Found an exited thread: record its thread id.
             ret_tid = ct->tid;
+            
             release(&ct->lock);
+            freeproc(ct);
             release(&wait_lock);
-            printf("SYS_Proc: reaches end of successful thread_join with %d as the tid\n", ret_tid);
+            // printf("SYS_Proc: reaches end of successful thread_join with %d as the tid\n", ret_tid);
             return ret_tid;
           }
           release(&ct->lock);
@@ -921,6 +919,8 @@ uint64 thread_exit(int exit_status) {
   acquire(&t->lock);
   acquire(&wait_lock);
 
+  // uvmreclaimthreadpages(t,t->trapframe->sp,0);
+
   list_del(t);
 
   wakeup(p); 
@@ -929,10 +929,12 @@ uint64 thread_exit(int exit_status) {
   t->xstate = exit_status;
   t->state = ZOMBIE;
 
+
+
   release(&wait_lock);
   // Note: t->lock is intentionally held for the context switch.
 
-  printf("SYS_Proc: Thread %d exited with status %d, waiting for sche()\n", t->tid, t->xstate);
+  // printf("SYS_Proc: Thread %d exited with status %d, waiting for sche()\n", t->tid, t->xstate);
   
   sched(); // Context switch: this call should never return
 

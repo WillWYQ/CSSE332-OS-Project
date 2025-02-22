@@ -55,9 +55,9 @@ void init_list(struct proc *list)
 {
   list->next_thread = list;
   list->last_thread = list;
-  printf("Initial list with thread %d\n",list->tid);
-  print_list_inord(list);
-  print_list_rev(list);
+  // printf("Initial list with thread %d\n",list->tid);
+  // print_list_inord(list);
+  // print_list_rev(list);
 }
 
 //Internally adds a thread 
@@ -82,9 +82,9 @@ static inline void __list_del(struct proc *last_thread, struct proc *me, struct 
 void list_add_tail(struct proc *head, struct proc *new)
 {
   __list_add(new, head->last_thread, head);
-  printf("Added thread %d to the list\n",new->tid);
-  print_list_inord(head);
-  print_list_rev(head);
+  // printf("Added thread %d to the list\n",new->tid);
+  // print_list_inord(head);
+  // print_list_rev(head);
 }
 
 void list_del(struct proc *entry)
@@ -113,5 +113,5 @@ void list_del(struct proc *entry)
     }
     release(&p->lock);
   }
-  printf("Deleted thread %d from the list\n", entry->tid);
+  // printf("Deleted thread %d from the list\n", entry->tid);
 }
